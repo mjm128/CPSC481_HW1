@@ -25,3 +25,11 @@ def check4Move(player, moveNum):
 		del moveList[:] #Clear list if move not added yet
 		time.sleep(duration) 
 	return moveList[-1] #Return last element of the list
+	
+def emptyLogFiles():
+	with open("log_x.txt", "w") as f:
+		f.seek(0)
+		f.truncate()
+	with open("log_y.txt", "w") as f:
+		f.seek(0)
+		f.truncate()
