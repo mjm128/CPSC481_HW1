@@ -10,4 +10,4 @@ PlayerX makes mistakes.
 Requirements:
 	- Anaconda 4.1.1
 	- Python 3.5.2
-	- Python-chess (pip install python-chess==0.15.2)
+	- Python-chess (pip install python-chess==0.15.3)
