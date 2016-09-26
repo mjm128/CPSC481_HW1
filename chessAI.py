@@ -6,3 +6,8 @@ def randomPlayer(board):
 	move = random.choice(list(board.legal_moves))
 	return move.uci()
 	
+def playerX(board):
+	pass
+	
+def playerY(board):
+	pass
