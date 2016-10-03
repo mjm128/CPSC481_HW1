@@ -57,35 +57,26 @@ def alphaBetaMin(board, alpha, beta, depth):
 	return beta
 	
 def evaluate(board):
-	if board.turn != chess.WHITE:
-		return heuristicX(board)
+	if board.turn == chess.WHITE:
+		return heuristicX(board) - heuristicY(board)
 	else:
-		return heuristicY(board)	
+		return heuristicY(board) - heuristicX(board)
 
 def heuristicX(board):
 	score = 0
-	score -= len(board.move_stack) #Number of moves
-	score += 9001 if board.is_checkmate() else 0
-	score += 99 if board.is_check() else 0
-	score -= len(board.legal_moves) * 5
+	score += 9001 if board.result() == "1-0" else 0
 	
 	for (piece, value) in [ (chess.KING, 0),
 							(chess.ROOK, 300),
 							(chess.KNIGHT, 100)]:
-		score += len(board.pieces(piece, board.turn)) * value
-		score -= len(board.pieces(piece, not board.turn)) * value
+		score += len(board.pieces(piece, chess.WHITE)) * value
 	return score
 
 def heuristicY(board):
 	score = 0
-	score -= len(board.move_stack) #Number of moves
-	score += 9001 if board.is_checkmate() else 0
-	score += 99 if board.is_check() else 0
-	score -= len(board.legal_moves) * 5
+	score += 9001 if board.result() == "0-1" else 0
 	
 	for (piece, value) in [ (chess.KING, 0),
-							(chess.ROOK, 300),
 							(chess.KNIGHT, 100)]:
-		score += len(board.pieces(piece, board.turn)) * value
-		score -= len(board.pieces(piece, not board.turn)) * value
+		score += len(board.pieces(piece, chess.BLACK)) * value
 	return score
