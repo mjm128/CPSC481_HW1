@@ -78,8 +78,9 @@ def heuristicX(board, wR, wN, wK, bK, bN):
 	score += 9001 if board.result() == "1-0" else 0
 	score += whiteDefRook(board, wR, wK)
 	score += whiteRookAtk(board, wR, bK)
-	score -= len(board.move_stack)
-	score += len(board.attacks(list(wK)[0]))
+	if len(wR) > 0:
+		score -= len(board.move_stack)
+		score += len(board.attacks(list(wK)[0]))
 	
 	score += len(wN) * 150
 	score += len(wR) * 300
@@ -95,19 +96,17 @@ def heuristicY(board, wR, wN, wK, bK, bN):
 	
 def whiteDefRook(board, wr, wk):
 	score = 0
-	if len(wr) >= 1:
-		guard = board.attackers(chess.WHITE, list(wk)[0])
-		for squares in guard:
-			if squares == list(wk)[0]:
-				score = 20 #King gaurding Rook
-		x = abs(chess.rank_index(list(wr)[0]) - chess.rank_index(list(wk)[0]))
-		y = abs(chess.file_index(list(wr)[0]) - chess.file_index(list(wk)[0]))
-		return score -min(x,y)
+	guard = board.attackers(chess.WHITE, list(wk)[0])
+	for squares in guard:
+		if squares == list(wk)[0]:
+			score = 50 #King gaurding Rook
+	x = abs(chess.rank_index(list(wr)[0]) - chess.rank_index(list(wk)[0]))
+	y = abs(chess.file_index(list(wr)[0]) - chess.file_index(list(wk)[0]))
+	return score -min(x,y)
 	return 0
 	
 def whiteRookAtk(board, wr, bk):
-	if len(wr) >= 1:
-		x = abs(chess.rank_index(list(wr)[0]) - chess.rank_index(list(bk)[0]))**2
-		y = abs(chess.file_index(list(wr)[0]) - chess.file_index(list(bk)[0]))**2
-		return -min(x,y)
+	x = abs(chess.rank_index(list(wr)[0]) - chess.rank_index(list(bk)[0]))**2
+	y = abs(chess.file_index(list(wr)[0]) - chess.file_index(list(bk)[0]))**2
+	return -min(x,y)
 	return 0
