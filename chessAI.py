@@ -1,5 +1,6 @@
 import chess
 import random
+from math import *
 from operator import itemgetter
 
 #This function is purely for testing purposes
@@ -12,20 +13,25 @@ def computerPlayer(board):
 	board_copy = board
 	moveList = []
 	bestMoves = []
+	depth = 5
+	if len(board.move_stack) <= 3:
+		depth = 5
 	for i in board_copy.legal_moves:
 		board_copy.push(i)
-		score = alphaBetaMin(board_copy, float("-inf"), float("inf"), 5)
+		score = alphaBetaMin(board_copy, float("-inf"), float("inf"), depth)
 		board_copy.pop()
 		moveList.append((i, score))
 	
 	#Get the best score from moves
-	bestScore = sorted(moveList, key=itemgetter(1), reverse=True)[0][1]
-	for i in moveList:
-		if i[1] == bestScore:
-			#Add best moves to list
-			bestMoves.append(i[0])
-			
-	return random.choice(bestMoves) #Return random best move
+	moveList = sorted(moveList, key=itemgetter(1), reverse=True)
+	bestValue = moveList[0][1]
+	index = len(moveList)
+	for (i, v) in enumerate(moveList):
+		if v[1] != bestValue:
+			index = i
+			break
+	print(moveList)
+	return moveList[random.randrange(0, index)][0] #Return random best move
 	
 def alphaBetaMax(board, alpha, beta, depth):
 	if depth == 0 or board.is_checkmate() or board.is_stalemate():
@@ -57,26 +63,51 @@ def alphaBetaMin(board, alpha, beta, depth):
 	return beta
 	
 def evaluate(board):
+	wR = board.pieces(chess.ROOK, chess.WHITE)
+	wN = board.pieces(chess.KNIGHT, chess.WHITE)
+	wK = board.pieces(chess.KING, chess.WHITE)
+	bK = board.pieces(chess.KING, chess.BLACK)
+	bN = board.pieces(chess.KNIGHT, chess.BLACK)
 	if board.turn == chess.WHITE:
-		return heuristicX(board) - heuristicY(board)
+		return heuristicX(board, wR, wN, wK, bK, bN) - heuristicY(board, wR, wN, wK, bK, bN)
 	else:
-		return heuristicY(board) - heuristicX(board)
+		return heuristicY(board, wR, wN, wK, bK, bN) - heuristicX(board, wR, wN, wK, bK, bN)
 
-def heuristicX(board):
+def heuristicX(board, wR, wN, wK, bK, bN):
 	score = 0
 	score += 9001 if board.result() == "1-0" else 0
+	score += whiteDefRook(board, wR, wK)
+	score += whiteRookAtk(board, wR, bK)
+	score -= len(board.move_stack)
+	score += len(board.attacks(list(wK)[0]))
 	
-	for (piece, value) in [ (chess.KING, 0),
-							(chess.ROOK, 300),
-							(chess.KNIGHT, 100)]:
-		score += len(board.pieces(piece, chess.WHITE)) * value
+	score += len(wN) * 150
+	score += len(wR) * 300
+	
 	return score
 
-def heuristicY(board):
+def heuristicY(board, wR, wN, wK, bK, bN):
 	score = 0
 	score += 9001 if board.result() == "0-1" else 0
+	score += len(bN) * 150
 	
-	for (piece, value) in [ (chess.KING, 0),
-							(chess.KNIGHT, 100)]:
-		score += len(board.pieces(piece, chess.BLACK)) * value
 	return score
+	
+def whiteDefRook(board, wr, wk):
+	score = 0
+	if len(wr) >= 1:
+		guard = board.attackers(chess.WHITE, list(wk)[0])
+		for squares in guard:
+			if squares == list(wk)[0]:
+				score = 20 #King gaurding Rook
+		x = abs(chess.rank_index(list(wr)[0]) - chess.rank_index(list(wk)[0]))
+		y = abs(chess.file_index(list(wr)[0]) - chess.file_index(list(wk)[0]))
+		return score -min(x,y)
+	return 0
+	
+def whiteRookAtk(board, wr, bk):
+	if len(wr) >= 1:
+		x = abs(chess.rank_index(list(wr)[0]) - chess.rank_index(list(bk)[0]))**2
+		y = abs(chess.file_index(list(wr)[0]) - chess.file_index(list(bk)[0]))**2
+		return -min(x,y)
+	return 0
