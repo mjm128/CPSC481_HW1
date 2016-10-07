@@ -4,7 +4,7 @@ import os
 def check4Move(player, moveNum):
 	#MoveNum must start at 1 and go up to N
 	moveList = []
-	duration = 1
+	duration = .5
 	if player == "X":
 		file = "log_y.txt"
 	if player == "Y":
@@ -27,7 +27,8 @@ def check4Move(player, moveNum):
 	return moveList[-1] #Return last element of the list
 	
 def emptyLogFiles():
-	if os.path.getsize("log_x.txt") >= 7:
+	if os.path.getsize("log_x.txt") > 1:
+		print("Cleared log files")
 		with open("log_x.txt", "w") as f:
 			f.seek(0)
 			f.truncate()
