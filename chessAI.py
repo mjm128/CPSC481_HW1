@@ -76,12 +76,13 @@ def evaluate(board):
 def heuristicX(board, wR, wN, wK, bK, bN):
 	score = 0
 	score += 9001 if board.result() == "1-0" else 0
-	score += whiteDefRook(board, wR, wK)
-	score += whiteRookAtk(board, wR, bK)
-	if len(wR) > 0:
-		score -= len(board.move_stack)
-		score += len(board.attacks(list(wK)[0]))
+	if len(wR) > 0: #Check to see if white rook exists
+		score += whiteDefRook(board, wR, wK)
+		score += whiteRookAtk(board, wR, bK)
 	
+	score -= len(board.move_stack)
+	score += len(board.attacks(list(wK)[0]))	
+
 	score += len(wN) * 150
 	score += len(wR) * 300
 	
@@ -91,6 +92,7 @@ def heuristicY(board, wR, wN, wK, bK, bN):
 	score = 0
 	score += 9001 if board.result() == "0-1" else 0
 	score += len(bN) * 150
+	score += len(board.move_stack)
 	
 	return score
 	
@@ -106,7 +108,7 @@ def whiteDefRook(board, wr, wk):
 	return 0
 	
 def whiteRookAtk(board, wr, bk):
-	x = abs(chess.rank_index(list(wr)[0]) - chess.rank_index(list(bk)[0]))**2
-	y = abs(chess.file_index(list(wr)[0]) - chess.file_index(list(bk)[0]))**2
+	x = abs(chess.rank_index(list(wr)[0]) - chess.rank_index(list(bk)[0]))
+	y = abs(chess.file_index(list(wr)[0]) - chess.file_index(list(bk)[0]))
 	return -min(x,y)
 	return 0
