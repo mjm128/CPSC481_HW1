@@ -111,4 +111,3 @@ def whiteRookAtk(board, wr, bk):
 	x = abs(chess.rank_index(list(wr)[0]) - chess.rank_index(list(bk)[0]))
 	y = abs(chess.file_index(list(wr)[0]) - chess.file_index(list(bk)[0]))
 	return -min(x,y)
-	return 0
