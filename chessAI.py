@@ -105,7 +105,6 @@ def whiteDefRook(board, wr, wk):
 	x = abs(chess.rank_index(list(wr)[0]) - chess.rank_index(list(wk)[0]))
 	y = abs(chess.file_index(list(wr)[0]) - chess.file_index(list(wk)[0]))
 	return score -min(x,y)
-	return 0
 	
 def whiteRookAtk(board, wr, bk):
 	x = abs(chess.rank_index(list(wr)[0]) - chess.rank_index(list(bk)[0]))
