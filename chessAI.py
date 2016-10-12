@@ -23,9 +23,9 @@ def computerPlayer(board):
 	board_copy = board
 	moveList = []
 	bestMoves = []
-	depth = 5
+	depth = 4
 	if len(board.move_stack) <= 3:
-		depth -= 2
+		depth -= 0
 	for i in board_copy.legal_moves:
 		board_copy.push(i)
 		score = alphaBetaMin(board_copy, float("-inf"), float("inf"), depth)
@@ -107,6 +107,7 @@ def heuristicY(board, wR, wN, wK, bK, bN):
 	score += len(bN) * 150
 	score += len(board.move_stack)
 	score += bKposition[list(bK)[0]]
+	score += len(board.attacks(list(bK)[0]))
 	
 	return score
 	
@@ -114,17 +115,17 @@ def whiteDefRook(board, wr, wk):
 	score = 0
 	guard = board.attackers(chess.WHITE, list(wk)[0])
 	if len(guard) > 0:
-			score = 25 #King gaurding Rook
-	x = abs(chess.rank_index(list(wr)[0]) - chess.rank_index(list(wk)[0]))
-	y = abs(chess.file_index(list(wr)[0]) - chess.file_index(list(wk)[0]))
-	return score + (10-min(x,y))
+			score = 50 #King gaurding Rook
+	x = chess.rank_index(list(wr)[0]) - chess.rank_index(list(wk)[0])
+	y = chess.file_index(list(wr)[0]) - chess.file_index(list(wk)[0])
+	return score + (20-floor((y**2 + x**2)**(1/2)))
 	
 def whiteRookAtk(board, wr, bk):
 	x = abs(chess.rank_index(list(wr)[0]) - chess.rank_index(list(bk)[0]))
 	y = abs(chess.file_index(list(wr)[0]) - chess.file_index(list(bk)[0]))
-	return 10-min(x,y)
+	return max(x,y)
 	
 def wkMove2bk(wk, bk):
-	x = chess.rank_index(list(wk)[0]) - chess.rank_index(list(wk)[0])
-	y = chess.file_index(list(bk)[0]) - chess.file_index(list(bk)[0])
-	return 10 - floor((y**2 + x**2)**(1/2))
+	x = chess.rank_index(list(wk)[0]) - chess.rank_index(list(bk)[0])
+	y = chess.file_index(list(wk)[0]) - chess.file_index(list(bk)[0])
+	return 20 - floor((y**2 + x**2)**(1/2))
