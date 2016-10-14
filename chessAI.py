@@ -3,34 +3,52 @@ import random
 import time
 from math import *
 from operator import itemgetter
+from multiprocessing import Pool as ThreadPool
+from os import cpu_count
 
-bKposition=[-5, 0, 0, 0, 0, 0, 0, -5,
-			0, 1, 2, 2, 2, 2, 1, 0,
-			0, 2, 5, 5, 5, 5, 2, 0,
-			0, 2, 5, 5, 5, 5, 2, 0,
-			0, 2, 5, 5, 5, 5, 2, 0,
-			0, 2, 5, 5, 5, 5, 2, 0,
-			0, 1, 2, 2, 2, 2, 1, 0,
-			-5, 0, 0, 0, 0, 0, 0, -5]
+bKposition=[0, 1, 2, 2, 2, 2, 1, 0,
+			1, 1, 3, 3, 3, 3, 1, 1,
+			2, 3, 4, 4, 4, 4, 3, 2,
+			2, 3, 4, 5, 5, 4, 3, 2,
+			2, 3, 4, 5, 5, 4, 3, 2,
+			2, 3, 4, 4, 4, 4, 3, 2,
+			1, 1, 3, 3, 3, 3, 1, 1,
+			0, 1, 2, 2, 2, 2, 1, 0]
+
+MAX_INT = 100000
+DEPTH = 5
 
 #This function is purely for testing purposes
 def randomPlayer(board):
 	move = random.choice(list(board.legal_moves))
 	return move.uci()
-	
+
+def moveThreading(data):
+	#data[0] is the move
+	#data[1] is the board
+	data[1].push(data[0])
+	score = -negaScout(data[1], -MAX_INT, MAX_INT, DEPTH)
+	data[1].pop()
+	return (data[0], score)
+		
 def computerPlayer(board):
 	#Call to get which move is best
 	board_copy = board
 	moveList = []
-	bestMoves = []
-	depth = 4
-	if len(board.move_stack) <= 3:
-		depth -= 0
+	
+	#Multithreading start
+	threadData = []
+	threads = min(len(board_copy.legal_moves), (cpu_count()-1))
+	pool = ThreadPool(processes=threads)
+	
 	for i in board_copy.legal_moves:
-		board_copy.push(i)
-		score = alphaBetaMin(board_copy, float("-inf"), float("inf"), depth)
-		board_copy.pop()
-		moveList.append((i, score))
+		threadData.append((i, board_copy))
+		
+	moveList = pool.map(moveThreading, threadData)
+	
+	#end multithreading
+	pool.close()
+	pool.join()
 	
 	#Get the best score from moves
 	moveList = sorted(moveList, key=itemgetter(1), reverse=True)
@@ -40,38 +58,39 @@ def computerPlayer(board):
 		if v[1] != bestValue:
 			index = i
 			break
+	
+	if (board.turn == chess.WHITE):
+	#Check for 3 fold repetition move
+		for i in moveList:
+			board_copy.push(i[0])
+			if board_copy.can_claim_threefold_repetition():
+				print("THREE_FOLD_REPITITION")
+			board_copy.pop()
+	
 	print(moveList)
 	time.sleep(1)
 	return moveList[random.randrange(0, index)][0] #Return random best move
 	
-def alphaBetaMax(board, alpha, beta, depth):
+def negaScout(board, alpha, beta, depth):
 	if depth == 0 or board.result() != "*":
 		return evaluate(board)
-	
-	#Iterate through legal moves, DFS.
+
+	b = beta
+	c = 0
 	for i in board.legal_moves:
 		board.push(i)
-		score = alphaBetaMin(board, alpha, beta, depth-1)
+		score = -negaScout(board, -b, -alpha, depth - 1)
 		board.pop()
-		if score >= beta:
-			return beta
-		if score > alpha:
-			alpha = score
-	return alpha
-	
-def alphaBetaMin(board, alpha, beta, depth):
-	if depth == 0 or board.result() != "*":
-		return -evaluate(board)
-		
-	for i in board.legal_moves:
-		board.push(i)
-		score = alphaBetaMax(board, alpha, beta, depth-1)
-		board.pop()
-		if score <= alpha:
+		if score > alpha and score < beta and c > 0:
+			board.push(i)
+			score = -negaScout(board, -beta, -alpha, depth - 1)
+			board.pop()
+		alpha = max(alpha, score)
+		if alpha >= beta:
 			return alpha
-		if score < beta:
-			beta = score
-	return beta
+		b = alpha + 1
+		c += 1
+	return alpha
 	
 def evaluate(board):
 	wR = board.pieces(chess.ROOK, chess.WHITE)
