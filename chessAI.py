@@ -36,6 +36,9 @@ def computerPlayer(board):
 	board_copy = board
 	moveList = []
 	
+	#start move benchmark
+	start = time.time()
+	
 	#Multithreading start
 	threadData = []
 	threads = min(len(board_copy.legal_moves), (cpu_count()-1))
@@ -43,12 +46,20 @@ def computerPlayer(board):
 	
 	for i in board_copy.legal_moves:
 		threadData.append((i, board_copy))
-		
+	
 	moveList = pool.map(moveThreading, threadData)
 	
 	#end multithreading
 	pool.close()
 	pool.join()
+	
+	#Output move benchmark time
+	if board.turn == chess.WHITE:
+		with open("time_x.txt", "a+") as f:
+			f.write(str(time.time() - start) + "\n")
+	if board.turn == chess.BLACK:
+		with open("time_y.txt", "a+") as f:
+			f.write(str(time.time() - start) + "\n")
 	
 	#Get the best score from moves
 	moveList = sorted(moveList, key=itemgetter(1), reverse=True)
@@ -67,7 +78,7 @@ def computerPlayer(board):
 	if (board.turn == chess.BLACK):
 		for i in moveList:
 			board_copy.push(i[0])
-			if board_copy.can_claim_threefold_repetition() and i[1] == bestValue:\
+			if board_copy.can_claim_threefold_repetition() and i[1] == bestValue:
 				board_copy.pop()
 				return (i[0]) #Return threefold repition move
 			board_copy.pop()
