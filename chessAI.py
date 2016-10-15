@@ -16,7 +16,7 @@ bKposition=[0, 1, 2, 2, 2, 2, 1, 0,
 			0, 1, 2, 2, 2, 2, 1, 0]
 
 MAX_INT = 100000
-DEPTH = 5
+DEPTH = 4
 
 #This function is purely for testing purposes
 def randomPlayer(board):
@@ -53,19 +53,31 @@ def computerPlayer(board):
 	#Get the best score from moves
 	moveList = sorted(moveList, key=itemgetter(1), reverse=True)
 	bestValue = moveList[0][1]
+			
+	#Check for 3 fold repetition move
+	if (board.turn == chess.WHITE):
+		for (i, v) in enumerate(moveList):
+			board_copy.push(v[0])
+			if board_copy.can_claim_threefold_repetition():
+				moveList[i] = (v[0], v[1]-10) #Takeaway 10 points
+				print("THREE_FOLD_REPETITION")
+				board_copy.pop()
+				break
+			board_copy.pop()
+	if (board.turn == chess.BLACK):
+		for i in moveList:
+			board_copy.push(i[0])
+			if board_copy.can_claim_threefold_repetition() and i[1] == bestValue:\
+				board_copy.pop()
+				return (i[0]) #Return threefold repition move
+			board_copy.pop()
+	
+	#Get index range of best moves
 	index = len(moveList)
 	for (i, v) in enumerate(moveList):
 		if v[1] != bestValue:
 			index = i
 			break
-	
-	if (board.turn == chess.WHITE):
-	#Check for 3 fold repetition move
-		for i in moveList:
-			board_copy.push(i[0])
-			if board_copy.can_claim_threefold_repetition():
-				print("THREE_FOLD_REPITITION")
-			board_copy.pop()
 	
 	print(moveList)
 	time.sleep(1)
