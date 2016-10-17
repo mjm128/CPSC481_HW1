@@ -42,7 +42,6 @@ class EV_Item(Structure):
 
 EV_Table = Array(EV_Item, 16 * 1000000)
 TT_Table = Array(TT_Item, 16 * 1000000)
-BEST_SCORE = Value(c_int, -MAX_INT)
 
 def load_ev(key):
 	with EV_Table.get_lock():
@@ -93,25 +92,29 @@ def moveThreading(data):
 	#data[1] is the score
 	#data[2] is the depth
 	#data[3] is the board
-	with BEST_SCORE.get_lock():
-		best = BEST_SCORE.value
+
+	if data[1] == None:
+		alpha = -MAX_INT
+		beta = MAX_INT
+	else:
+		alpha = -abs(data[1]) - 5
+		beta = abs(data[1]) + 5
 
 	data[3].push(data[0])
-	data[1] = -negaScout(data[3], -abs(best), MAX_INT, data[2])
+	data[1] = -negaScout(data[3], alpha, beta, data[2])
 	data[3].pop()
 
-	with BEST_SCORE.get_lock():
-		BEST_SCORE.value = max(best, data[1])
+	if data[1] < alpha or data[1] > beta:
+		data[3].push(data[0])
+		data[1] = -negaScout(data[3], -MAX_INT, MAX_INT, data[2])
+		data[3].pop()
 
 	return data
 
 def search(board):
-	# reset lower starting search window
-	BEST_SCORE.value = -MAX_INT
-
 	threadData = []
 	for i in board.legal_moves:
-		threadData.append([i, 0, 0, board])
+		threadData.append([i, None, 0, board])
 
 	threads = min(len(board.legal_moves), cpu_count() - 1)
 	for depth in range(0, DEPTH + 1):
@@ -169,19 +172,61 @@ def computerPlayer(board):
 	print(moveList)
 	time.sleep(1)
 	return moveList[random.randrange(0, index)][0] #Return random best move
-	
-def negaScout(board, alpha, beta, depth):
-	if depth == 0 or board.result() != "*":
-		return evaluate(board)
 
+def quiescence(board, alpha, beta):
+	score = evaluate(board)
+	if score >= beta:
+		return score
+	elif score > alpha:
+		alpha = score
+
+	for i in board.legal_moves:
+		if not board.is_capture(i):
+			continue
+		board.push(i)
+		score = -quiescence(board, -beta, -alpha)
+		board.pop()
+
+		if score >= beta:
+			return score
+		if score > alpha:
+			alpha = score
+	return alpha
+
+def isValid(board, move):
+	if not move in board.pseudo_legal_moves:
+		return False
+	board.push(move)
+	valid = board.is_valid()
+	board.pop()
+	return valid
+
+def negaScout(board, alpha, beta, depth):
+	if board.result() != "*":
+		return evaluate(board)
+	if depth == 0:
+		return quiescence(board, alpha, beta)
+
+	boundType = UPPER
 	item = load_tt(board.zobrist_hash(), alpha, beta, depth)
-	if item != None and item[0] != None:
-		return item[0]
+	if item != None:
+		if item[0] != None:
+			return item[0]
+		elif isValid(board, item[1]):
+			board.push(item[1])
+			score = -negaScout(board, -beta, -alpha, depth - 1)
+			board.pop()
+
+			if score >= beta:
+				store_tt(board.zobrist_hash(), score, depth, item[1], LOWER)
+				return beta
+			elif score > alpha:
+				alpha = score
+				boundType = EXACT
 
 	b = beta
 	c = 0
 	bestMove = None
-	boundType = UPPER
 	for i in board.legal_moves:
 		board.push(i)
 		score = -negaScout(board, -b, -alpha, depth - 1)
@@ -230,7 +275,7 @@ def heuristicX(board, wR, wN, wK, bK, bN):
 		score += whiteDefRook(board, wR, wK)*2
 		score += whiteRookAtk(board, wR, bK)
 		
-		#
+		#Rook attacking around Black King
 		len(board.attacks(list(bK)[0]).intersection(board.attacks(list(wR)[0]))) * 2
 		
 		#defend rook with king
