@@ -1,10 +1,13 @@
 import chess
+import chess.uci
 import random
 import time
 from math import *
 from operator import itemgetter
-from multiprocessing import Pool as ThreadPool
+from multiprocessing import Pool as ThreadPool, Array, Value
+from ctypes import c_byte, c_int, c_ulonglong, Structure
 from os import cpu_count
+import copy
 
 bKposition=[0, 1, 2, 2, 2, 2, 1, 0,
 			1, 1, 3, 3, 3, 3, 1, 1,
@@ -17,41 +20,122 @@ bKposition=[0, 1, 2, 2, 2, 2, 1, 0,
 
 MAX_INT = 100000
 DEPTH = 4
+UPPER = 0
+EXACT = 1
+LOWER = 2
+
+class TT_Item(Structure):
+	_fields_ = [
+		('key', c_ulonglong),
+		('depth', c_int),
+		('flag', c_byte),
+		('score', c_int),
+		('m_from', c_byte),
+		('m_to', c_byte)
+	]
+
+class EV_Item(Structure):
+	_fields_ = [
+		('key', c_ulonglong),
+		('val', c_int)
+	]
+
+EV_Table = Array(EV_Item, 16 * 1000000)
+TT_Table = Array(TT_Item, 16 * 1000000)
+BEST_SCORE = Value(c_int, -MAX_INT)
+
+def load_ev(key):
+	with EV_Table.get_lock():
+		item = copy.deepcopy(EV_Table[key % len(EV_Table)])
+	return item.val if item.key == key else None
+
+def store_ev(key, val):
+	with EV_Table.get_lock():
+		EV_Table[key % len(EV_Table)] = EV_Item(key, val)
+
+def load_tt(key, alpha, beta, depth):
+	with TT_Table.get_lock():
+		item = copy.deepcopy(TT_Table[key % len(TT_Table)])
+	if item.key != key:
+		return None
+	move = chess.Move(item.m_from, item.m_to)
+	if item.depth < depth:
+		return [None, move]
+	elif item.flag == UPPER:
+		return [alpha, move] if item.score < alpha else [None, move]
+	elif item.flag == EXACT:
+		return [item.score, move]
+	else:
+		return [beta, move] if item.score >= beta else [None, move]
+
+def store_tt(key, score, depth, move, flag):
+	m_from = move.from_square if move != None else 0
+	m_to = move.to_square if move != None else 0
+	with TT_Table.get_lock():
+		TT_Table[key % len(TT_Table)] = TT_Item(key, depth, flag, score, m_from, m_to)
 
 #This function is purely for testing purposes
 def randomPlayer(board):
 	move = random.choice(list(board.legal_moves))
 	return move.uci()
 
+#For testing play against stockfish engine
+def stockFish(board, time):
+	engine = chess.uci.popen_engine("stockfish-7-win\Windows\stockfish7x64popcnt")
+	engine.position(board)
+	move = engine.go(movetime=time*1000)
+	return move[0]
+
 def moveThreading(data):
 	#data[0] is the move
-	#data[1] is the board
-	data[1].push(data[0])
-	score = -negaScout(data[1], -MAX_INT, MAX_INT, DEPTH)
-	data[1].pop()
-	return (data[0], score)
-		
+	#data[1] is the score
+	#data[2] is the depth
+	#data[3] is the board
+	with BEST_SCORE.get_lock():
+		best = BEST_SCORE.value
+
+	data[3].push(data[0])
+	data[1] = -negaScout(data[3], -abs(best), MAX_INT, data[2])
+	data[3].pop()
+
+	with BEST_SCORE.get_lock():
+		BEST_SCORE.value = max(best, data[1])
+
+	return data
+
+def search(board):
+	# reset lower starting search window
+	BEST_SCORE.value = -MAX_INT
+
+	threadData = []
+	for i in board.legal_moves:
+		threadData.append([i, 0, 0, board])
+
+	threads = min(len(board.legal_moves), cpu_count() - 1)
+	for depth in range(0, DEPTH + 1):
+		# set the current depth to search
+		for i in range(len(threadData)):
+			threadData[i][2] = depth
+		pool = ThreadPool(processes=threads)
+		threadData = pool.map(moveThreading, threadData)
+		pool.close()
+		pool.join()
+		threadData = sorted(threadData, key=itemgetter(1), reverse=True)
+
+	moveList = []
+	for item in threadData:
+		moveList.append((item[0], item[1]))
+	return moveList
+
 def computerPlayer(board):
 	#Call to get which move is best
 	board_copy = board
-	moveList = []
 	
 	#start move benchmark
 	start = time.time()
 	
 	#Multithreading start
-	threadData = []
-	threads = min(len(board_copy.legal_moves), (cpu_count()-1))
-	pool = ThreadPool(processes=threads)
-	
-	for i in board_copy.legal_moves:
-		threadData.append((i, board_copy))
-	
-	moveList = pool.map(moveThreading, threadData)
-	
-	#end multithreading
-	pool.close()
-	pool.join()
+	moveList = search(board)
 	
 	#Output move benchmark time
 	if board.turn == chess.WHITE:
@@ -62,7 +146,6 @@ def computerPlayer(board):
 			f.write(str(time.time() - start) + "\n")
 	
 	#Get the best score from moves
-	moveList = sorted(moveList, key=itemgetter(1), reverse=True)
 	bestValue = moveList[0][1]
 			
 	#Check for 3 fold repetition move
@@ -98,8 +181,14 @@ def negaScout(board, alpha, beta, depth):
 	if depth == 0 or board.result() != "*":
 		return evaluate(board)
 
+	item = load_tt(board.zobrist_hash(), alpha, beta, depth)
+	if item != None and item[0] != None:
+		return item[0]
+
 	b = beta
 	c = 0
+	bestMove = None
+	boundType = UPPER
 	for i in board.legal_moves:
 		board.push(i)
 		score = -negaScout(board, -b, -alpha, depth - 1)
@@ -108,23 +197,38 @@ def negaScout(board, alpha, beta, depth):
 			board.push(i)
 			score = -negaScout(board, -beta, -alpha, depth - 1)
 			board.pop()
-		alpha = max(alpha, score)
-		if alpha >= beta:
-			return alpha
+		if score > alpha:
+			boundType = EXACT
+			bestMove = i
+			alpha = score
+			if alpha >= beta:
+				boundType = LOWER
+				break
 		b = alpha + 1
 		c += 1
+
+	store_tt(board.zobrist_hash(), alpha, depth, bestMove, boundType)
+
 	return alpha
 	
 def evaluate(board):
+	val = load_ev(board.zobrist_hash())
+	if val != None:
+		return val
+
 	wR = board.pieces(chess.ROOK, chess.WHITE)
 	wN = board.pieces(chess.KNIGHT, chess.WHITE)
 	wK = board.pieces(chess.KING, chess.WHITE)
 	bK = board.pieces(chess.KING, chess.BLACK)
 	bN = board.pieces(chess.KNIGHT, chess.BLACK)
 	if board.turn == chess.WHITE:
-		return heuristicX(board, wR, wN, wK, bK, bN) - heuristicY(board, wR, wN, wK, bK, bN)
+		ret = heuristicX(board, wR, wN, wK, bK, bN) - heuristicY(board, wR, wN, wK, bK, bN)
 	else:
-		return heuristicY(board, wR, wN, wK, bK, bN) - heuristicX(board, wR, wN, wK, bK, bN)
+		ret = heuristicY(board, wR, wN, wK, bK, bN) - heuristicX(board, wR, wN, wK, bK, bN)
+
+	store_ev(board.zobrist_hash(), ret)
+
+	return ret
 
 def heuristicX(board, wR, wN, wK, bK, bN):
 	score = 0
