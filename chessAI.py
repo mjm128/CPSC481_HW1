@@ -156,9 +156,7 @@ def computerPlayer(board):
 		if board_copy.can_claim_threefold_repetition():
 			moveList[0][1] = moveList[0][1] - 50 #take away 50 points
 			print("THREE_FOLD_REPETITION")
-			board_copy.pop()
 			moveList = sorted(moveList, key=itemgetter(1), reverse=True)
-			break
 		board_copy.pop()
 	
 	#Get index range of best moves
