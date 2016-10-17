@@ -226,10 +226,26 @@ def evaluate(board):
 def heuristicX(board, wR, wN, wK, bK, bN):
 	score = 0
 	score += 9001 if board.result() == "1-0" else 0
-	if len(wR) > 0: #Check to see if white rook exists
+	if bool(wR): #Check to see if white rook exists
 		score += whiteDefRook(board, wR, wK)*2
 		score += whiteRookAtk(board, wR, bK)
 		
+		#
+		len(board.attacks(list(bK)[0]).intersection(board.attacks(list(wR)[0]))) * 2
+		
+		#defend rook with king
+		len(board.attacks(list(wK)[0]).intersection(wR)) * 2
+	
+	if bool(wN):
+		len(board.attacks(list(bK)[0]).intersection(board.attacks(list(wN)[0]))) * 4
+		
+		#defend night with king
+		len(board.attacks(list(wK)[0]).intersection(wN)) * 6
+		
+	if board.is_pinned(chess.BLACK, list(bK)[0]):
+		score += 40
+	
+	len(board.attacks(list(bK)[0]).intersection(board.attacks(list(wK)[0]))) * 4
 	score += wkMove2bk(wK, bK)*3
 	score -= len(board.move_stack)
 	score += len(board.attacks(list(wK)[0]))	
@@ -243,26 +259,25 @@ def heuristicY(board, wR, wN, wK, bK, bN):
 	score = 0
 	score += 9001 if board.result() == "0-1" else 0
 	score += 9001 if board.is_stalemate() else 0
-	score += len(bN) * 150
 	score += len(board.move_stack)
 	score += bKposition[list(bK)[0]]
 	score += len(board.attacks(list(bK)[0]))
 	
+	if bool(bN): 
+		score += 150
+		len(board.attacks(list(bK)[0]).intersection(bN)) * 6
+	
 	return score
 	
 def whiteDefRook(board, wr, wk):
-	score = 0
-	guard = board.attackers(chess.WHITE, list(wk)[0])
-	if len(guard) > 0:
-			score = 50 #King gaurding Rook
 	x = chess.rank_index(list(wr)[0]) - chess.rank_index(list(wk)[0])
 	y = chess.file_index(list(wr)[0]) - chess.file_index(list(wk)[0])
-	return score + (20-floor((y**2 + x**2)**(1/2)))
+	return 20-floor((y**2 + x**2)**(1/2))
 	
 def whiteRookAtk(board, wr, bk):
 	x = abs(chess.rank_index(list(wr)[0]) - chess.rank_index(list(bk)[0]))
 	y = abs(chess.file_index(list(wr)[0]) - chess.file_index(list(bk)[0]))
-	return max(x,y)
+	return 8-min(x,y)
 	
 def wkMove2bk(wk, bk):
 	x = chess.rank_index(list(wk)[0]) - chess.rank_index(list(bk)[0])
