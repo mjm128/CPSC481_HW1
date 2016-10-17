@@ -126,7 +126,7 @@ def search(board):
 
 	moveList = []
 	for item in threadData:
-		moveList.append((item[0], item[1]))
+		moveList.append([item[0], item[1]])
 	return moveList
 
 def computerPlayer(board):
