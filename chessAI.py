@@ -81,7 +81,9 @@ def randomPlayer(board):
 
 #For testing play against stockfish engine
 def stockFish(board, time):
-	engine = chess.uci.popen_engine("stockfish-7-win\Windows\stockfish7x64popcnt")
+	#Make sure to download a copy of stock fish and place one
+	#Version of it in the following relative dir location
+	engine = chess.uci.popen_engine("stockfish\stockfish")
 	engine.position(board)
 	move = engine.go(movetime=time*1000)
 	return move[0]
@@ -150,21 +152,14 @@ def computerPlayer(board):
 			
 	#Check for 3 fold repetition move
 	if (board.turn == chess.WHITE):
-		for (i, v) in enumerate(moveList):
-			board_copy.push(v[0])
-			if board_copy.can_claim_threefold_repetition():
-				moveList[i] = (v[0], v[1]-10) #Takeaway 10 points
-				print("THREE_FOLD_REPETITION")
-				board_copy.pop()
-				break
+		board_copy.push(moveList[0][0])
+		if board_copy.can_claim_threefold_repetition():
+			moveList[0][1] = moveList[0][1] - 50 #take away 50 points
+			print("THREE_FOLD_REPETITION")
 			board_copy.pop()
-	if (board.turn == chess.BLACK):
-		for i in moveList:
-			board_copy.push(i[0])
-			if board_copy.can_claim_threefold_repetition() and i[1] == bestValue:
-				board_copy.pop()
-				return (i[0]) #Return threefold repition move
-			board_copy.pop()
+			moveList = sorted(moveList, key=itemgetter(1), reverse=True)
+			break
+		board_copy.pop()
 	
 	#Get index range of best moves
 	index = len(moveList)
