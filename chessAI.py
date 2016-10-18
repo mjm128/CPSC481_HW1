@@ -41,8 +41,8 @@ class EV_Item(Structure):
 		('val', c_int)
 	]
 
-EV_Table = Array(EV_Item, 16 * 1000000)
-TT_Table = Array(TT_Item, 16 * 1000000)
+EV_Table = Array(EV_Item, 32 * 1000000)
+TT_Table = Array(TT_Item, 32 * 1000000)
 
 def load_ev(key):
 	with EV_Table.get_lock():
@@ -167,6 +167,7 @@ def computerPlayer(board):
 			moveList[0][1] = moveList[0][1] - 50 #take away 50 points
 			print("THREE_FOLD_REPETITION")
 			moveList = sorted(moveList, key=itemgetter(1), reverse=True)
+			bestValue = moveList[0][1]
 		board_copy.pop()
 	
 	#Get index range of best moves
