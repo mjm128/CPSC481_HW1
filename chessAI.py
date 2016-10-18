@@ -4,7 +4,7 @@ import random
 import time
 from math import *
 from operator import itemgetter
-from multiprocessing import Pool as ThreadPool, Array, Value
+from multiprocessing import Pool as ThreadPool, Process, Array, Value, TimeoutError
 from ctypes import c_byte, c_int, c_ulonglong, Structure
 from os import cpu_count
 import copy
@@ -19,6 +19,7 @@ bKposition=[0, 1, 2, 2, 2, 2, 1, 0,
 			0, 1, 2, 2, 2, 2, 1, 0]
 
 MAX_INT = 100000
+MAX_TIME = 10
 DEPTH = 4
 UPPER = 0
 EXACT = 1
@@ -111,25 +112,31 @@ def moveThreading(data):
 
 	return data
 
-def search(board):
+def search(board, start):
 	threadData = []
 	for i in board.legal_moves:
 		threadData.append([i, None, 0, board])
 
-	threads = min(len(board.legal_moves), cpu_count() - 1)
-	for depth in range(0, DEPTH + 1):
+	moveList = []
+	for depth in range(0, 10):
 		# set the current depth to search
 		for i in range(len(threadData)):
 			threadData[i][2] = depth
-		pool = ThreadPool(processes=threads)
-		threadData = pool.map(moveThreading, threadData)
-		pool.close()
-		pool.join()
-		threadData = sorted(threadData, key=itemgetter(1), reverse=True)
 
-	moveList = []
-	for item in threadData:
-		moveList.append([item[0], item[1]])
+		pool = ThreadPool(processes=cpu_count() - 1)
+		result = pool.map_async(moveThreading, threadData)
+
+		try:
+			threadData = result.get(int(MAX_TIME - (time.time() - start)))
+			threadData = sorted(threadData, key=itemgetter(1), reverse=True)
+			moveList = [[item[0], item[1]] for item in threadData]
+		except TimeoutError:
+			break
+
+		pool.terminate()
+		pool.join()
+		pool = None
+
 	return moveList
 
 def computerPlayer(board):
@@ -140,7 +147,7 @@ def computerPlayer(board):
 	start = time.time()
 	
 	#Multithreading start
-	moveList = search(board)
+	moveList = search(board, start)
 	
 	#Output move benchmark time
 	if board.turn == chess.WHITE:
@@ -285,12 +292,12 @@ def heuristicX(board, wR, wN, wK, bK, bN):
 		len(board.attacks(list(bK)[0]).intersection(board.attacks(list(wN)[0]))) * 4
 		
 		#defend night with king
-		len(board.attacks(list(wK)[0]).intersection(wN)) * 6
+		len(board.attacks(list(wK)[0]).intersection(wN)) * 2
 		
 	if board.is_pinned(chess.BLACK, list(bK)[0]):
 		score += 40
 	
-	len(board.attacks(list(bK)[0]).intersection(board.attacks(list(wK)[0]))) * 4
+	len(board.attacks(list(bK)[0]).intersection(board.attacks(list(wK)[0]))) * 5
 	score += wkMove2bk(wK, bK)*3
 	score -= len(board.move_stack)
 	score += len(board.attacks(list(wK)[0]))	
