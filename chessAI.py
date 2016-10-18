@@ -41,8 +41,8 @@ class EV_Item(Structure):
 		('val', c_int)
 	]
 
-EV_Table = Array(EV_Item, 32 * 1000000)
-TT_Table = Array(TT_Item, 32 * 1000000)
+EV_Table = Array(EV_Item, 16 * 1000000)
+TT_Table = Array(TT_Item, 16 * 1000000)
 
 def load_ev(key):
 	with EV_Table.get_lock():
@@ -86,6 +86,7 @@ def stockFish(board, time):
 	engine = chess.uci.popen_engine("stockfish\stockfish")
 	engine.position(board)
 	move = engine.go(movetime=time*1000)
+	engine.quit()
 	return move[0]
 
 def moveThreading(data):
@@ -117,13 +118,14 @@ def search(board, start):
 	for i in board.legal_moves:
 		threadData.append([i, None, 0, board])
 
+	threads = min(len(threadData), cpu_count()-1)
+	pool = ThreadPool(processes=threads)
 	moveList = []
 	for depth in range(0, 10):
 		# set the current depth to search
 		for i in range(len(threadData)):
 			threadData[i][2] = depth
 
-		pool = ThreadPool(processes=cpu_count() - 1)
 		result = pool.map_async(moveThreading, threadData)
 
 		try:
@@ -131,16 +133,18 @@ def search(board, start):
 			threadData = sorted(threadData, key=itemgetter(1), reverse=True)
 			moveList = [[item[0], item[1]] for item in threadData]
 		except TimeoutError:
+			pool.terminate()
+			pool.join()
+			pool = None
 			break
 
-		pool.terminate()
-		pool.join()
-		pool = None
+		#pool.terminate()
+		#pool.join()
+		#pool = None
 
 	return moveList
 
 def computerPlayer(board):
-	#Call to get which move is best
 	board_copy = board
 	
 	#start move benchmark
