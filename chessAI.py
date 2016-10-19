@@ -10,14 +10,23 @@ from os import cpu_count
 import copy
 import platform
 
-bKposition=[0, 3, 6, 6, 6, 6, 3, 0,
-			3, 3, 9, 9, 9, 9, 3, 3,
-			6, 9, 15, 15, 15, 15, 9, 6,
-			6, 9, 15, 15, 15, 15, 9, 6,
-			6, 9, 15, 15, 15, 15, 9, 6,
-			6, 9, 15, 15, 15, 15, 9, 6,
-			3, 3, 9, 9, 9, 9, 3, 3,
-			0, 3, 6, 6, 6, 6, 3, 0]
+bKposition=[-50,-40,-30,-20,-20,-30,-40,-50,
+			-30,-20,-10,-10,-10,-10,-20,-30,
+			-30,-10, 20, 30, 30, 20,-10,-30,
+			-30,-10, 30, 40, 40, 30,-10,-30,
+			-30,-10, 30, 40, 40, 30,-10,-30,
+			-30,-10, 20, 30, 30, 20,-10,-30,
+			-30,-30,-10,-10,-10,-10,-30,-30,
+			-50,-30,-30,-30,-30,-30,-30,-50]
+			
+knightPos = [-50,-40,-30,-30,-30,-30,-40,-50,
+			-40,-20,  0,  0,  0,  0,-20,-40,
+			-30,  0, 10, 15, 15, 10,  0,-30,
+			-30,  5, 15, 20, 20, 15,  5,-30,
+			-30,  0, 15, 20, 20, 15,  0,-30,
+			-30,  5, 10, 15, 15, 10,  5,-30,
+			-40,-20,  0,  5,  5,  0,-20,-40,
+			-50,-40,-30,-30,-30,-30,-40,-50,]
 
 MAX_INT = 100000
 MAX_TIME = 10
@@ -25,6 +34,7 @@ DEPTH = 4
 UPPER = 0
 EXACT = 1
 LOWER = 2
+HAS_KNIGHT = False
 
 class TT_Item(Structure):
 	_fields_ = [
@@ -48,13 +58,16 @@ EV_Table = Array(EV_Item, 2097169, lock=False)
 # grows at about 11k per search
 TT_Table = Array(TT_Item,  524309, lock=False)
 
+#Load evaluation table 
 def load_ev(key):
 	item = copy.deepcopy(EV_Table[key % len(EV_Table)])
 	return item.val if item.key == key else None
 
+#Store evaluation in table
 def store_ev(key, val):
 	EV_Table[key % len(EV_Table)] = EV_Item(key, val)
 
+#Load transpotition table
 def load_tt(key, alpha, beta, depth):
 	item = copy.deepcopy(TT_Table[key % len(TT_Table)])
 	if item.key != key:
@@ -69,6 +82,7 @@ def load_tt(key, alpha, beta, depth):
 	else:
 		return [beta, move] if item.score >= beta else [None, move]
 
+#Store transpotition table 
 def store_tt(key, score, depth, move, flag):
 	m_from = move.from_square if move != None else 0
 	m_to = move.to_square if move != None else 0
@@ -121,7 +135,7 @@ def search(board, start):
 	for i in board.legal_moves:
 		threadData.append([i, None, 0, board])
 
-	threads = min(len(threadData), cpu_count()-1)
+	threads = min(len(threadData), cpu_count()-4)
 	pool = ThreadPool(processes=threads)
 	moveList = []
 	for depth in range(0, 10):
@@ -149,6 +163,12 @@ def computerPlayer(board):
 	
 	#start move benchmark
 	start = time.time()
+	
+	#Check if black knight is on board
+	if bool(board.pieces(chess.KNIGHT, chess.BLACK)):
+		HAS_KNIGHT = True
+	else:
+		HAS_KNIGHT = False
 	
 	#Multithreading start
 	moveList = search(board, start)
@@ -273,15 +293,21 @@ def evaluate(board):
 	bK = board.pieces(chess.KING, chess.BLACK)
 	bN = board.pieces(chess.KNIGHT, chess.BLACK)
 	if board.turn == chess.WHITE:
-		ret = heuristicX(board, wR, wN, wK, bK, bN) - heuristicY(board, wR, wN, wK, bK, bN)
+		if HAS_KNIGHT:
+			ret = heuristicX(board, wR, wN, wK, bK, bN) - heuristicY(board, wR, wN, wK, bK, bN)
+		else:
+			ret = heuristicX1(board, wR, wN, wK, bK, bN) - heuristicY1(board, wR, wN, wK, bK, bN)
 	else:
-		ret = heuristicY(board, wR, wN, wK, bK, bN) - heuristicX(board, wR, wN, wK, bK, bN)
+		if HAS_KNIGHT:
+			ret = heuristicY(board, wR, wN, wK, bK, bN) - heuristicX(board, wR, wN, wK, bK, bN)
+		else:
+			ret = heuristicY1(board, wR, wN, wK, bK, bN) - heuristicX1(board, wR, wN, wK, bK, bN)
 
 	store_ev(board.zobrist_hash(), ret)
 
 	return ret
 
-def heuristicX(board, wR, wN, wK, bK, bN):
+def heuristicX1(board, wR, wN, wK, bK, bN):
 	score = 0
 	score += 9001 if board.result() == "1-0" else 0
 	if bool(wR): #Check to see if white rook exists
@@ -333,12 +359,66 @@ def heuristicX(board, wR, wN, wK, bK, bN):
 	
 	return score
 
+def heuristicX(board, wR, wN, wK, bK, bN):
+	score = 0
+	score += 9001 if board.result() == "1-0" else 0
+	KnightMoves = None
+	KnightMoves = board.attacks(list(wK)[0])
+	AroundKing = board.attacks(list(bK)[0])
+	if bool(bN):
+		x = abs(chess.rank_index(list(wK)[0]) - chess.rank_index(list(bN)[0]))
+		y = abs(chess.file_index(list(wK)[0]) - chess.file_index(list(bN)[0]))
+		score -= x+y
+		KnightMoves = board.attacks(list(bN)[0])
+		KnightMoves = KnightMoves.intersection(bN)
+		
+		if bool(wR):
+			x = abs(chess.rank_index(list(wR)[0]) - chess.rank_index(list(bN)[0]))
+			y = abs(chess.file_index(list(wR)[0]) - chess.file_index(list(bN)[0]))
+			score -= min(x,y)
+			AtkingKnight = AtkingKnight.intersection(board.attacks(list(wR)[0])) 
+			score += 300
+		
+		if bool(wN):
+			x = abs(chess.rank_index(list(wR)[0]) - chess.rank_index(list(bN)[0]))
+			y = abs(chess.file_index(list(wR)[0]) - chess.file_index(list(bN)[0]))
+			score -= x+y
+			AtkingKnight = AtkingKnight.intersection(board.attacks(list(wN)))
+			score += 150
+	
+	if board.is_pinned(chess.WHITE, list(bK)[0]):
+		print("PINNED")
+		print(board)
+		score += 50
+	
+	score += len(AroundKing.intersection(AtkingKnight))
+	score += 50 if board.is_check() else 0
+	score += len(AtkingKnight.intersection(KnightMoves)) * 4
+	score -= len(board.move_stack)
+	score += len(board.attacks(list(wK)[0]))
+	
+	return score
+	
 def heuristicY(board, wR, wN, wK, bK, bN):
 	score = 0
 	score += 9001 if board.result() == "0-1" else 0
 	score += 9001 if board.is_stalemate() else 0
 	score += len(board.move_stack)
-	score += bKposition[list(bK)[0]]*3
+	score += bKposition[list(bK)[0]]
+	score += len(board.attacks(list(bK)[0]))
+	
+	if bool(bN):
+		score += 150
+		score += knightPos[list(bN)[0]]
+	
+	return score
+
+def heuristicY1(board, wR, wN, wK, bK, bN):
+	score = 0
+	score += 9001 if board.result() == "0-1" else 0
+	score += 9001 if board.is_stalemate() else 0
+	score += len(board.move_stack)
+	score += bKposition[list(bK)[0]]
 	score += len(board.attacks(list(bK)[0]))
 	
 	if bool(bN): 
