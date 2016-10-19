@@ -8,15 +8,16 @@ from multiprocessing import Pool as ThreadPool, Process, Array, Value, TimeoutEr
 from ctypes import c_byte, c_int, c_ulonglong, Structure
 from os import cpu_count
 import copy
+import platform
 
-bKposition=[0, 1, 2, 2, 2, 2, 1, 0,
-			1, 1, 3, 3, 3, 3, 1, 1,
-			2, 3, 5, 5, 5, 5, 3, 2,
-			2, 3, 5, 5, 5, 5, 3, 2,
-			2, 3, 5, 5, 5, 5, 3, 2,
-			2, 3, 5, 5, 5, 5, 3, 2,
-			1, 1, 3, 3, 3, 3, 1, 1,
-			0, 1, 2, 2, 2, 2, 1, 0]
+bKposition=[0, 3, 6, 6, 6, 6, 3, 0,
+			3, 3, 9, 9, 9, 9, 3, 3,
+			6, 9, 15, 15, 15, 15, 9, 6,
+			6, 9, 15, 15, 15, 15, 9, 6,
+			6, 9, 15, 15, 15, 15, 9, 6,
+			6, 9, 15, 15, 15, 15, 9, 6,
+			3, 3, 9, 9, 9, 9, 3, 3,
+			0, 3, 6, 6, 6, 6, 3, 0]
 
 MAX_INT = 100000
 MAX_TIME = 10
@@ -82,7 +83,10 @@ def randomPlayer(board):
 def stockFish(board, time):
 	#Make sure to download a copy of stock fish and place one
 	#Version of it in the following relative dir location
-	engine = chess.uci.popen_engine("stockfish\stockfish")
+	if platform.system() == "Windows":
+		engine = chess.uci.popen_engine("stockfish\stockfish-windows")
+	else:
+		engine = chess.uci.popen_engine("stockfish/stockfish")
 	engine.position(board)
 	move = engine.go(movetime=time*1000)
 	engine.quit()
@@ -334,7 +338,7 @@ def heuristicY(board, wR, wN, wK, bK, bN):
 	score += 9001 if board.result() == "0-1" else 0
 	score += 9001 if board.is_stalemate() else 0
 	score += len(board.move_stack)
-	score += bKposition[list(bK)[0]]
+	score += bKposition[list(bK)[0]]*3
 	score += len(board.attacks(list(bK)[0]))
 	
 	if bool(bN): 
