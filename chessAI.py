@@ -11,10 +11,10 @@ import copy
 
 bKposition=[0, 1, 2, 2, 2, 2, 1, 0,
 			1, 1, 3, 3, 3, 3, 1, 1,
-			2, 3, 4, 4, 4, 4, 3, 2,
-			2, 3, 4, 5, 5, 4, 3, 2,
-			2, 3, 4, 5, 5, 4, 3, 2,
-			2, 3, 4, 4, 4, 4, 3, 2,
+			2, 3, 5, 5, 5, 5, 3, 2,
+			2, 3, 5, 5, 5, 5, 3, 2,
+			2, 3, 5, 5, 5, 5, 3, 2,
+			2, 3, 5, 5, 5, 5, 3, 2,
 			1, 1, 3, 3, 3, 3, 1, 1,
 			0, 1, 2, 2, 2, 2, 1, 0]
 
@@ -41,21 +41,21 @@ class EV_Item(Structure):
 		('val', c_int)
 	]
 
-EV_Table = Array(EV_Item, 16 * 1000000)
-TT_Table = Array(TT_Item, 16 * 1000000)
+# grows at about 32k per search
+EV_Table = Array(EV_Item, 2097169, lock=False)
+
+# grows at about 11k per search
+TT_Table = Array(TT_Item,  524309, lock=False)
 
 def load_ev(key):
-	with EV_Table.get_lock():
-		item = copy.deepcopy(EV_Table[key % len(EV_Table)])
+	item = copy.deepcopy(EV_Table[key % len(EV_Table)])
 	return item.val if item.key == key else None
 
 def store_ev(key, val):
-	with EV_Table.get_lock():
-		EV_Table[key % len(EV_Table)] = EV_Item(key, val)
+	EV_Table[key % len(EV_Table)] = EV_Item(key, val)
 
 def load_tt(key, alpha, beta, depth):
-	with TT_Table.get_lock():
-		item = copy.deepcopy(TT_Table[key % len(TT_Table)])
+	item = copy.deepcopy(TT_Table[key % len(TT_Table)])
 	if item.key != key:
 		return None
 	move = chess.Move(item.m_from, item.m_to)
@@ -71,8 +71,7 @@ def load_tt(key, alpha, beta, depth):
 def store_tt(key, score, depth, move, flag):
 	m_from = move.from_square if move != None else 0
 	m_to = move.to_square if move != None else 0
-	with TT_Table.get_lock():
-		TT_Table[key % len(TT_Table)] = TT_Item(key, depth, flag, score, m_from, m_to)
+	TT_Table[key % len(TT_Table)] = TT_Item(key, depth, flag, score, m_from, m_to)
 
 #This function is purely for testing purposes
 def randomPlayer(board):
@@ -127,9 +126,10 @@ def search(board, start):
 			threadData[i][2] = depth
 
 		result = pool.map_async(moveThreading, threadData)
-
+		
+		print(depth)
 		try:
-			threadData = result.get(int(MAX_TIME - (time.time() - start)))
+			threadData = result.get(MAX_TIME - (time.time() - start))
 			threadData = sorted(threadData, key=itemgetter(1), reverse=True)
 			moveList = [[item[0], item[1]] for item in threadData]
 		except TimeoutError:
@@ -137,10 +137,6 @@ def search(board, start):
 			pool.join()
 			pool = None
 			break
-
-		#pool.terminate()
-		#pool.join()
-		#pool = None
 
 	return moveList
 
@@ -168,10 +164,11 @@ def computerPlayer(board):
 	if (board.turn == chess.WHITE):
 		board_copy.push(moveList[0][0])
 		if board_copy.can_claim_threefold_repetition():
-			moveList[0][1] = moveList[0][1] - 50 #take away 50 points
-			print("THREE_FOLD_REPETITION")
-			moveList = sorted(moveList, key=itemgetter(1), reverse=True)
-			bestValue = moveList[0][1]
+			if len(moveList) > 1:
+				moveList[0][1] = moveList[1][1] - 1 #take away points
+				print("THREE_FOLD_REPETITION")
+				moveList = sorted(moveList, key=itemgetter(1), reverse=True)
+				bestValue = moveList[0][1]
 		board_copy.pop()
 	
 	#Get index range of best moves
@@ -284,31 +281,51 @@ def heuristicX(board, wR, wN, wK, bK, bN):
 	score = 0
 	score += 9001 if board.result() == "1-0" else 0
 	if bool(wR): #Check to see if white rook exists
+		score += 300 #Has a rook
+		
 		score += whiteDefRook(board, wR, wK)*2
 		score += whiteRookAtk(board, wR, bK)
 		
 		#Rook attacking around Black King
-		len(board.attacks(list(bK)[0]).intersection(board.attacks(list(wR)[0]))) * 2
+		if bool( board.attacks(list(bK)[0]).intersection(board.attacks(list(wR)[0])) ):
+			score += 5
 		
 		#defend rook with king
-		len(board.attacks(list(wK)[0]).intersection(wR)) * 2
+		if bool( board.attacks(list(wK)[0]).intersection(wR) ):
+			score += 5
+		
+		#Rook attacking king
+		if bool( board.attacks(list(wR)[0]).intersection(bK) ):
+			score += 10
 	
 	if bool(wN):
-		len(board.attacks(list(bK)[0]).intersection(board.attacks(list(wN)[0]))) * 4
+		score += 150 #has a Knight
 		
-		#defend night with king
-		len(board.attacks(list(wK)[0]).intersection(wN)) * 2
+		#Knight attacking around Black King
+		if bool( board.attacks(list(bK)[0]).intersection(board.attacks(list(wN)[0])) ):
+			score += 5
 		
+		#defend Knight with king
+		if bool( board.attacks(list(wK)[0]).intersection(wN) ):
+			score += 5
+		
+		#Knight attacking king
+		if bool( board.attacks(list(wN)[0]).intersection(bK) ):
+			score += 10
+		
+	if not bool(bN):
+		score += 76
+		if not bool(wN):
+			score += 75
 	if board.is_pinned(chess.BLACK, list(bK)[0]):
 		score += 40
 	
-	len(board.attacks(list(bK)[0]).intersection(board.attacks(list(wK)[0]))) * 5
+	if bool( board.attacks(list(bK)[0]).intersection(board.attacks(list(wK)[0])) ):
+		score += 10
+		
 	score += wkMove2bk(wK, bK)*3
 	score -= len(board.move_stack)
-	score += len(board.attacks(list(wK)[0]))	
-
-	score += len(wN) * 150
-	score += len(wR) * 300
+	score += len(board.attacks(list(wK)[0]))
 	
 	return score
 
@@ -322,7 +339,7 @@ def heuristicY(board, wR, wN, wK, bK, bN):
 	
 	if bool(bN): 
 		score += 150
-		len(board.attacks(list(bK)[0]).intersection(bN)) * 6
+		score += len(board.attacks(list(bK)[0]).intersection(bN)) * 6
 	
 	return score
 	
