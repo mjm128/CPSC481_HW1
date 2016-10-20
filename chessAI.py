@@ -93,6 +93,18 @@ def randomPlayer(board):
 	move = random.choice(list(board.legal_moves))
 	return move.uci()
 
+#Function is used for manually playing against engine	
+def manualInput(board):
+	while True:
+		if board.turn == chess.WHITE:
+			uci = input("Player X Turn: ")
+		else:
+			uci = input("Player Y Turn: ")
+		if chess.Move.from_uci(uci) in board.legal_moves:
+			return uci
+		else:
+			print("Illegal Move: Try again.")
+
 #For testing play against stockfish engine
 def stockFish(board, time):
 	#Make sure to download a copy of stock fish and place one
@@ -135,17 +147,17 @@ def search(board, start):
 	for i in board.legal_moves:
 		threadData.append([i, None, 0, board])
 
-	threads = min(len(threadData), cpu_count()-4)
+	threads = min(len(threadData), cpu_count()-1)
 	pool = ThreadPool(processes=threads)
 	moveList = []
-	for depth in range(0, 10):
+	for depth in range(0, 20):
 		# set the current depth to search
 		for i in range(len(threadData)):
 			threadData[i][2] = depth
 
 		result = pool.map_async(moveThreading, threadData)
 		
-		print(depth)
+		#print(depth)
 		try:
 			threadData = result.get(MAX_TIME - (time.time() - start))
 			threadData = sorted(threadData, key=itemgetter(1), reverse=True)
@@ -174,12 +186,12 @@ def computerPlayer(board):
 	moveList = search(board, start)
 	
 	#Output move benchmark time
-	if board.turn == chess.WHITE:
-		with open("time_x.txt", "a+") as f:
-			f.write(str(time.time() - start) + "\n")
-	if board.turn == chess.BLACK:
-		with open("time_y.txt", "a+") as f:
-			f.write(str(time.time() - start) + "\n")
+	#if board.turn == chess.WHITE:
+		#with open("time_x.txt", "a+") as f:
+			#f.write(str(time.time() - start) + "\n")
+	#if board.turn == chess.BLACK:
+	#	with open("time_y.txt", "a+") as f:
+	#		f.write(str(time.time() - start) + "\n")
 	
 	#Get the best score from moves
 	bestValue = moveList[0][1]
@@ -190,7 +202,7 @@ def computerPlayer(board):
 		if board_copy.can_claim_threefold_repetition():
 			if len(moveList) > 1:
 				moveList[0][1] = moveList[1][1] - 1 #take away points
-				print("THREE_FOLD_REPETITION")
+				#print("THREE_FOLD_REPETITION")
 				moveList = sorted(moveList, key=itemgetter(1), reverse=True)
 				bestValue = moveList[0][1]
 		board_copy.pop()
@@ -202,8 +214,8 @@ def computerPlayer(board):
 			index = i
 			break
 	
-	print(moveList)
-	time.sleep(1)
+	#print(moveList)
+	#time.sleep(1)
 	return moveList[random.randrange(0, index)][0] #Return random best move
 
 def quiescence(board, alpha, beta):
@@ -392,7 +404,7 @@ def heuristicX(board, wR, wN, wK, bK, bN):
 		score += 50
 	
 	score += len(AroundKing.intersection(AtkingKnight))
-	score += 50 if board.is_check() else 0
+	score += 0 if board.is_check() else 0
 	score += len(AtkingKnight.intersection(KnightMoves)) * 4
 	score -= len(board.move_stack)
 	score += len(board.attacks(list(wK)[0]))
