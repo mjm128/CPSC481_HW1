@@ -1,9 +1,10 @@
 import time
 import os
+import chess
 
-def check4Move(player, moveNum):
+def check4Move(player, N):
 	#MoveNum must start at 1 and go up to N
-	moveList = []
+	lastMove = None
 	duration = .5
 	if player == "X":
 		file = "log_y.txt"
@@ -16,15 +17,11 @@ def check4Move(player, moveNum):
 				time.sleep(duration)
 			else:
 				for line in f:
-					#Add all lines of the file to a list
-					moveList.append(line.rstrip())
-				if player == "X" and len(moveList) == (moveNum*2):
-					break
-				if player == "Y" and len(moveList) == (1+((moveNum-1)*2)):
-					break
-		del moveList[:] #Clear list if move not added yet
+					lastMove = line
+				print(lastMove)
+				if lastMove.split(' ')[0] == str(N):
+					return lastMove.rstrip('\n')
 		time.sleep(duration) 
-	return moveList[-1] #Return last element of the list
 	
 def emptyLogFiles():
 	if os.path.getsize("log_x.txt") > 1:
