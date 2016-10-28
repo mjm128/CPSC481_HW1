@@ -35,6 +35,7 @@ UPPER = 0
 EXACT = 1
 LOWER = 2
 HAS_KNIGHT = False
+DIAGNOSTIC = True
 
 class TT_Item(Structure):
 	_fields_ = [
@@ -157,12 +158,18 @@ def search(board, start):
 
 		result = pool.map_async(moveThreading, threadData)
 		
-		#print(depth)
 		try:
 			threadData = result.get(MAX_TIME - (time.time() - start))
 			threadData = sorted(threadData, key=itemgetter(1), reverse=True)
 			moveList = [[item[0], item[1]] for item in threadData]
 		except TimeoutError:
+			#Diagnostic printing for analysis after game is played
+			if DIAGNOSTIC:
+				with open("diagnostic.txt", "a") as f:
+					f.write("@"+str(depth)+'==')
+					for i in moveList:
+						f.write("['"+str(i[0])+"'_"+str(i[1])+']')
+					f.write('\n')
 			pool.terminate()
 			pool.join()
 			pool = None
@@ -182,16 +189,13 @@ def computerPlayer(board):
 	else:
 		HAS_KNIGHT = False
 	
+	#Diagnostic printing for analysis after game is played
+	if DIAGNOSTIC:
+		with open("diagnostic.txt", "a") as f:
+			f.write(str(len(board.move_stack)+1))
+	
 	#Multithreading start
 	moveList = search(board, start)
-	
-	#Output move benchmark time
-	#if board.turn == chess.WHITE:
-		#with open("time_x.txt", "a+") as f:
-			#f.write(str(time.time() - start) + "\n")
-	#if board.turn == chess.BLACK:
-	#	with open("time_y.txt", "a+") as f:
-	#		f.write(str(time.time() - start) + "\n")
 	
 	#Get the best score from moves
 	bestValue = moveList[0][1]

@@ -31,3 +31,6 @@ def emptyLogFiles():
 		with open("log_y.txt", "w") as f:
 			f.seek(0)
 			f.truncate()
+		with open("diagnostic.txt", "w") as f:
+			f.seek(0)
+			f.truncate()
