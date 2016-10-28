@@ -18,7 +18,6 @@ def check4Move(player, N):
 			else:
 				for line in f:
 					lastMove = line
-				print(lastMove)
 				if lastMove.split(' ')[0] == str(N):
 					return lastMove.rstrip('\n')
 		time.sleep(duration) 
