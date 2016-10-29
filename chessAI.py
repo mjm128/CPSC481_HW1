@@ -199,6 +199,7 @@ def computerPlayer(board):
 	
 	#Get the best score from moves
 	bestValue = moveList[0][1]
+
 			
 	#Check for 3 fold repetition move
 	if (board.turn == chess.WHITE):
@@ -331,18 +332,6 @@ def heuristicX1(board, wR, wN, wK, bK, bN):
 		
 		score += whiteDefRook(board, wR, wK)*2
 		score += whiteRookAtk(board, wR, bK)
-		
-		#Rook attacking around Black King
-		if bool( board.attacks(list(bK)[0]).intersection(board.attacks(list(wR)[0])) ):
-			score += 5
-		
-		#defend rook with king
-		if bool( board.attacks(list(wK)[0]).intersection(wR) ):
-			score += 5
-		
-		#Rook attacking king
-		if bool( board.attacks(list(wR)[0]).intersection(bK) ):
-			score += 10
 	
 	if bool(wN):
 		score += 150 #has a Knight
@@ -359,16 +348,6 @@ def heuristicX1(board, wR, wN, wK, bK, bN):
 		if bool( board.attacks(list(wN)[0]).intersection(bK) ):
 			score += 10
 		
-	if not bool(bN):
-		score += 76
-		if not bool(wN):
-			score += 75
-	if board.is_pinned(chess.BLACK, list(bK)[0]):
-		score += 40
-	
-	if bool( board.attacks(list(bK)[0]).intersection(board.attacks(list(wK)[0])) ):
-		score += 10
-		
 	score += wkMove2bk(wK, bK)*3
 	score -= len(board.move_stack)
 	score += len(board.attacks(list(wK)[0]))
@@ -378,40 +357,50 @@ def heuristicX1(board, wR, wN, wK, bK, bN):
 def heuristicX(board, wR, wN, wK, bK, bN):
 	score = 0
 	score += 9001 if board.result() == "1-0" else 0
+	
+	WRAtk = None
+	WNAtk = None
+	WKAtk = board.attacks(list(wK)[0])
+	
 	KnightMoves = None
-	KnightMoves = board.attacks(list(wK)[0])
 	AroundKing = board.attacks(list(bK)[0])
+	AroundKing = AroundKing.union(bK)
+	
 	if bool(bN):
+		#White Knight		
+		KnightMoves = board.attacks(list(bN)[0])
+		KnightMoves = KnightMoves.union(bN)
+		score += len(WKatk.intersection(KnightMoves))*2
 		x = abs(chess.rank_index(list(wK)[0]) - chess.rank_index(list(bN)[0]))
 		y = abs(chess.file_index(list(wK)[0]) - chess.file_index(list(bN)[0]))
-		score -= x+y
-		KnightMoves = board.attacks(list(bN)[0])
-		KnightMoves = KnightMoves.intersection(bN)
+		score -= (x+y)*5
 		
 		if bool(wR):
+			#White Rook
 			x = abs(chess.rank_index(list(wR)[0]) - chess.rank_index(list(bN)[0]))
 			y = abs(chess.file_index(list(wR)[0]) - chess.file_index(list(bN)[0]))
 			score -= min(x,y)
-			AtkingKnight = AtkingKnight.intersection(board.attacks(list(wR)[0])) 
-			score += 300
+			WRAtk = board.attacks(list(wR)[0])
+			score += len(WRAtk.intersection(KnightMoves))
+			
 		
 		if bool(wN):
+			#White Knight
 			x = abs(chess.rank_index(list(wR)[0]) - chess.rank_index(list(bN)[0]))
 			y = abs(chess.file_index(list(wR)[0]) - chess.file_index(list(bN)[0]))
-			score -= x+y
-			AtkingKnight = AtkingKnight.intersection(board.attacks(list(wN)))
-			score += 150
+			score -= (x+y)*3
+			WNAtk = board.attacks(list(wN))
+			score += len(WNAtk.intersection(KnightMoves))*2
 	
-	if board.is_pinned(chess.WHITE, list(bK)[0]):
-		print("PINNED")
-		print(board)
-		score += 50
+	WhiteAtk = WRAtk.union(WNAtk.union(WKAtk))
+	score += len(AroundKing.intersection(WhiteAtk))
+	score += 10 if bool(WhiteAtk.intersection(bK)) else 0
 	
-	score += len(AroundKing.intersection(AtkingKnight))
-	score += 0 if board.is_check() else 0
-	score += len(AtkingKnight.intersection(KnightMoves)) * 4
 	score -= len(board.move_stack)
 	score += len(board.attacks(list(wK)[0]))
+
+	score += len(wR)*300
+	score += len(wN)*150
 	
 	return score
 	
