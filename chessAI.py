@@ -101,10 +101,14 @@ def manualInput(board):
 			uci = input("Player X Turn: ")
 		else:
 			uci = input("Player Y Turn: ")
-		if chess.Move.from_uci(uci) in board.legal_moves:
-			return uci
-		else:
-			print("Illegal Move: Try again.")
+		try:
+			m = chess.Move.from_uci(uci)
+			if chess.Move.from_uci(uci) in board.legal_moves:
+				return uci
+			else:
+				print("Illegal Move: Try again.")
+		except:
+			print("Invalid Move String: Try again.")
 
 #For testing play against stockfish engine
 def stockFish(board, time):
