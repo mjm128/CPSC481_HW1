@@ -178,6 +178,7 @@ def search(board, start):
 	return moveList
 
 def computerPlayer(board):
+	global HAS_KNIGHT
 	board_copy = board
 	
 	#start move benchmark
@@ -370,7 +371,7 @@ def heuristicX(board, wR, wN, wK, bK, bN):
 		#White Knight		
 		KnightMoves = board.attacks(list(bN)[0])
 		KnightMoves = KnightMoves.union(bN)
-		score += len(WKatk.intersection(KnightMoves))*2
+		score += len(WKAtk.intersection(KnightMoves))*2
 		x = abs(chess.rank_index(list(wK)[0]) - chess.rank_index(list(bN)[0]))
 		y = abs(chess.file_index(list(wK)[0]) - chess.file_index(list(bN)[0]))
 		score -= (x+y)*5
@@ -415,6 +416,9 @@ def heuristicY(board, wR, wN, wK, bK, bN):
 	if bool(bN):
 		score += 150
 		score += knightPos[list(bN)[0]]
+		score += len(board.attacks(list(bK)[0]).intersection(bN)) * 6
+		
+		#if bool(board.attacks.
 	
 	return score
 
