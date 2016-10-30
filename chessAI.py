@@ -376,6 +376,10 @@ def heuristicX(board, wR, wN, wK, bK, bN):
 		y = abs(chess.file_index(list(wK)[0]) - chess.file_index(list(bN)[0]))
 		score -= (x+y)*5
 		
+		#Knight attacking both knight and king
+		if bool(WNAtk.intersection(bN)) and bool(WNAtk.intersection(bK)):
+			score += 50
+		
 		if bool(wR):
 			#White Rook
 			x = abs(chess.rank_index(list(wR)[0]) - chess.rank_index(list(bN)[0]))
@@ -392,6 +396,9 @@ def heuristicX(board, wR, wN, wK, bK, bN):
 			score -= (x+y)*3
 			WNAtk = board.attacks(list(wN))
 			score += len(WNAtk.intersection(KnightMoves))*2
+	
+	if not bool(bN) and not bool(wN):
+		score += 200
 	
 	WhiteAtk = WRAtk.union(WNAtk.union(WKAtk))
 	score += len(AroundKing.intersection(WhiteAtk))
@@ -413,12 +420,31 @@ def heuristicY(board, wR, wN, wK, bK, bN):
 	score += bKposition[list(bK)[0]]
 	score += len(board.attacks(list(bK)[0]))
 	
+	WRAtk = None
+	WNAtk = None
+	WKAtk = board.attacks(list(wK)[0])
+	
+	KnightMoves = None
 	if bool(bN):
+		KnightMoves = board.attacks(list(bN)[0])
 		score += 150
 		score += knightPos[list(bN)[0]]
 		score += len(board.attacks(list(bK)[0]).intersection(bN)) * 6
 		
-		#if bool(board.attacks.
+		if bool(wN):
+			WNAtk = board.attacks(list(wN)[0])
+			if bool(WNAtk.intersection(bN)) and bool(WNAtk.intersection(bK)):
+				score -= 150
+		if bool(wR):
+			WRAtk = board.attacks(list(wR)[0])
+			if bool(KnightMoves.intersection(wR)):
+				score += 50
+		if bool(KnightMoves.intersection(wK)):
+			score += 25
+	else:
+		score -= 50
+	if not bool(wR):
+		score += 75
 	
 	return score
 
