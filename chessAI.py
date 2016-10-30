@@ -5,7 +5,7 @@ import time
 from math import *
 from operator import itemgetter
 from multiprocessing import Pool as ThreadPool, Process, Array, Value, TimeoutError
-from ctypes import c_byte, c_int, c_ulonglong, Structure
+from ctypes import c_byte, c_int, c_ulonglong, c_bool, Structure
 from os import cpu_count
 import copy
 import platform
@@ -129,6 +129,13 @@ def moveThreading(data):
 	#data[2] is the depth
 	#data[3] is the board
 
+	global HAS_KNIGHT
+	#Check if black knight is on board
+	if bool(data[3].pieces(chess.KNIGHT, chess.BLACK)):
+		HAS_KNIGHT = True
+	else:
+		HAS_KNIGHT = False
+	
 	if data[1] == None:
 		alpha = -MAX_INT
 		beta = MAX_INT
@@ -170,7 +177,7 @@ def search(board, start):
 			#Diagnostic printing for analysis after game is played
 			if DIAGNOSTIC:
 				with open("diagnostic.txt", "a") as f:
-					f.write("@"+str(depth)+'==')
+					f.write("@"+str(depth-1)+'==')
 					for i in moveList:
 						f.write("['"+str(i[0])+"'_"+str(i[1])+']')
 					f.write('\n')
@@ -182,17 +189,10 @@ def search(board, start):
 	return moveList
 
 def computerPlayer(board):
-	global HAS_KNIGHT
 	board_copy = board
 	
 	#start move benchmark
 	start = time.time()
-	
-	#Check if black knight is on board
-	if bool(board.pieces(chess.KNIGHT, chess.BLACK)):
-		HAS_KNIGHT = True
-	else:
-		HAS_KNIGHT = False
 	
 	#Diagnostic printing for analysis after game is played
 	if DIAGNOSTIC:
@@ -308,7 +308,7 @@ def evaluate(board):
 	val = load_ev(board.zobrist_hash())
 	if val != None:
 		return val
-
+		
 	wR = board.pieces(chess.ROOK, chess.WHITE)
 	wN = board.pieces(chess.KNIGHT, chess.WHITE)
 	wK = board.pieces(chess.KING, chess.WHITE)
@@ -365,9 +365,9 @@ def heuristicX(board, wR, wN, wK, bK, bN):
 	
 	WRAtk = None
 	WNAtk = None
-	WKAtk = board.attacks(list(wK)[0])
-	
+	WhiteAtk = None
 	KnightMoves = None
+	WKAtk = board.attacks(list(wK)[0])
 	AroundKing = board.attacks(list(bK)[0])
 	AroundKing = AroundKing.union(bK)
 	
@@ -380,10 +380,6 @@ def heuristicX(board, wR, wN, wK, bK, bN):
 		y = abs(chess.file_index(list(wK)[0]) - chess.file_index(list(bN)[0]))
 		score -= (x+y)*5
 		
-		#Knight attacking both knight and king
-		if bool(WNAtk.intersection(bN)) and bool(WNAtk.intersection(bK)):
-			score += 50
-		
 		if bool(wR):
 			#White Rook
 			x = abs(chess.rank_index(list(wR)[0]) - chess.rank_index(list(bN)[0]))
@@ -391,22 +387,28 @@ def heuristicX(board, wR, wN, wK, bK, bN):
 			score -= min(x,y)
 			WRAtk = board.attacks(list(wR)[0])
 			score += len(WRAtk.intersection(KnightMoves))
+			WhiteAtk = WRAtk
 			
-		
 		if bool(wN):
 			#White Knight
-			x = abs(chess.rank_index(list(wR)[0]) - chess.rank_index(list(bN)[0]))
-			y = abs(chess.file_index(list(wR)[0]) - chess.file_index(list(bN)[0]))
+			x = abs(chess.rank_index(list(wN)[0]) - chess.rank_index(list(bN)[0]))
+			y = abs(chess.file_index(list(wN)[0]) - chess.file_index(list(bN)[0]))
 			score -= (x+y)*3
-			WNAtk = board.attacks(list(wN))
+			WNAtk = board.attacks(list(wN)[0])
+			if bool(WhiteAtk):
+				WhiteAtk.union(WRAtk)
+			#Knight attacking both knight and king
+			if bool(WNAtk.intersection(bN)) and bool(WNAtk.intersection(bK)):
+				score += 50
 			score += len(WNAtk.intersection(KnightMoves))*2
+			
 	
 	if not bool(bN) and not bool(wN):
-		score += 200
-	
-	WhiteAtk = WRAtk.union(WNAtk.union(WKAtk))
-	score += len(AroundKing.intersection(WhiteAtk))
-	score += 10 if bool(WhiteAtk.intersection(bK)) else 0
+		score += 150
+	if bool(WhiteAtk):
+		WhiteAtk = WhiteAtk.union(WKAtk)
+		score += len(AroundKing.intersection(WhiteAtk))
+		score += 10 if bool(WhiteAtk.intersection(bK)) else 0
 	
 	score -= len(board.move_stack)
 	score += len(board.attacks(list(wK)[0]))
@@ -441,21 +443,17 @@ def heuristicY(board, wR, wN, wK, bK, bN):
 		if bool(wN):
 			WNAtk = board.attacks(list(wN)[0])
 			#King and Knight under attack
-			if bool(WNAtk.intersection(bN)) and bool(WNAtk.intersection(bK)):
-				score -= 350
+			if not bool(WNAtk.intersection(bN)) and not bool(WNAtk.intersection(bK)):
+				score += 30
 
 		if bool(wR):
 			WRAtk = board.attacks(list(wR)[0])
 			#Black Knight attacking Rook
 			if bool(KnightMoves.intersection(wR)):
-				score += 25
+				score += 10
 		if bool(KnightMoves.intersection(wK)):
-			score += 75
-	if not bool(wR):
-		score += 50
-	if not bool(bN):
-		score -= 25
-	
+			score += 20
+
 	return score
 
 def heuristicY1(board, wR, wN, wK, bK, bN):
