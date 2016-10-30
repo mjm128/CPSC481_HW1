@@ -414,7 +414,6 @@ def heuristicX(board, wR, wN, wK, bK, bN):
 	
 def heuristicY(board, wR, wN, wK, bK, bN):
 	score = 0
-	score += 9001 if board.result() == "0-1" else 0
 	score += 9001 if board.is_stalemate() else 0
 	score += len(board.move_stack)
 	score += bKposition[list(bK)[0]]
@@ -429,36 +428,38 @@ def heuristicY(board, wR, wN, wK, bK, bN):
 		KnightMoves = board.attacks(list(bN)[0])
 		score += 150
 		score += knightPos[list(bN)[0]]
-		score += len(board.attacks(list(bK)[0]).intersection(bN)) * 6
+		score += len(KnightMoves)*5
+		
+		#Gaurd Knight
+		if bool(board.attacks(list(bK)[0]).intersection(bN)):
+			score += 25
 		
 		if bool(wN):
 			WNAtk = board.attacks(list(wN)[0])
+			#King and Knight under attack
 			if bool(WNAtk.intersection(bN)) and bool(WNAtk.intersection(bK)):
-				score -= 150
+				score -= 350
+
 		if bool(wR):
 			WRAtk = board.attacks(list(wR)[0])
+			#Black Knight attacking Rook
 			if bool(KnightMoves.intersection(wR)):
-				score += 50
+				score += 25
 		if bool(KnightMoves.intersection(wK)):
-			score += 25
-	else:
-		score -= 50
+			score += 75
 	if not bool(wR):
-		score += 75
+		score += 50
+	if not bool(bN):
+		score -= 25
 	
 	return score
 
 def heuristicY1(board, wR, wN, wK, bK, bN):
 	score = 0
-	score += 9001 if board.result() == "0-1" else 0
 	score += 9001 if board.is_stalemate() else 0
 	score += len(board.move_stack)
 	score += bKposition[list(bK)[0]]
 	score += len(board.attacks(list(bK)[0]))
-	
-	if bool(bN): 
-		score += 150
-		score += len(board.attacks(list(bK)[0]).intersection(bN)) * 6
 	
 	return score
 	
