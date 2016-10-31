@@ -72,6 +72,8 @@ def analyze(b, args):
 
 	while chessAI.MAX_DEPTH > 0:
 		board.push(move)
+		if board.result() != "*":
+			break
 		depth, move, moveList = chessAI.computerPlayer(board)
 		print(board)
 		print("depth : " + str(depth))
