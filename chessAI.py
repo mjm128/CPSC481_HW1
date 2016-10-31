@@ -135,22 +135,10 @@ def moveThreading(data):
 		HAS_KNIGHT = True
 	else:
 		HAS_KNIGHT = False
-	
-	if data[1] == None:
-		alpha = -MAX_INT
-		beta = MAX_INT
-	else:
-		alpha = -abs(data[1]) - 5
-		beta = abs(data[1]) + 5
 
 	data[3].push(data[0])
-	data[1] = -negaScout(data[3], alpha, beta, data[2])
+	data[1] = -negaScout(data[3], -MAX_INT, MAX_INT, data[2])
 	data[3].pop()
-
-	if data[1] < alpha or data[1] > beta:
-		data[3].push(data[0])
-		data[1] = -negaScout(data[3], -MAX_INT, MAX_INT, data[2])
-		data[3].pop()
 
 	return data
 
