@@ -30,7 +30,7 @@ knightPos = [-50,-40,-30,-30,-30,-30,-40,-50,
 
 MAX_INT = 100000
 MAX_TIME = 10
-DEPTH = 4
+MAX_DEPTH = 20
 UPPER = 0
 EXACT = 1
 LOWER = 2
@@ -154,15 +154,15 @@ def moveThreading(data):
 
 	return data
 
-def search(board, start):
-	threadData = []
-	for i in board.legal_moves:
-		threadData.append([i, None, 0, board])
+def search(board, maxDepth, maxTime):
+	start = time.time()
 
+	threadData = [[i, None, 0, board] for i in board.legal_moves]
 	threads = min(len(threadData), cpu_count()-1)
 	pool = ThreadPool(processes=threads)
 	moveList = []
-	for depth in range(0, 20):
+	gotDepth = -1
+	for depth in range(0, maxDepth):
 		# set the current depth to search
 		for i in range(len(threadData)):
 			threadData[i][2] = depth
@@ -170,7 +170,8 @@ def search(board, start):
 		result = pool.map_async(moveThreading, threadData)
 		
 		try:
-			threadData = result.get(MAX_TIME - (time.time() - start))
+			threadData = result.get(maxTime - (time.time() - start))
+			gotDepth = depth
 			threadData = sorted(threadData, key=itemgetter(1), reverse=True)
 			moveList = [[item[0], item[1]] for item in threadData]
 		except TimeoutError:
@@ -186,13 +187,10 @@ def search(board, start):
 			pool = None
 			break
 
-	return moveList
+	return gotDepth, moveList
 
 def computerPlayer(board):
-	board_copy = board
-	
-	#start move benchmark
-	start = time.time()
+	board
 	
 	#Diagnostic printing for analysis after game is played
 	if DIAGNOSTIC:
@@ -200,23 +198,22 @@ def computerPlayer(board):
 			f.write(str(len(board.move_stack)+1))
 	
 	#Multithreading start
-	moveList = search(board, start)
+	depth, moveList = search(board, MAX_DEPTH, MAX_TIME)
 	
 	#Get the best score from moves
 	bestValue = moveList[0][1]
 
-			
 	#Check for 3 fold repetition move
 	if (board.turn == chess.WHITE):
-		board_copy.push(moveList[0][0])
-		if board_copy.can_claim_threefold_repetition():
+		board.push(moveList[0][0])
+		if board.can_claim_threefold_repetition():
 			if len(moveList) > 1:
 				moveList[0][1] = moveList[1][1] - 1 #take away points
 				#print("THREE_FOLD_REPETITION")
 				moveList = sorted(moveList, key=itemgetter(1), reverse=True)
 				bestValue = moveList[0][1]
-		board_copy.pop()
-	
+		board.pop()
+
 	#Get index range of best moves
 	index = len(moveList)
 	for (i, v) in enumerate(moveList):
@@ -226,7 +223,7 @@ def computerPlayer(board):
 	
 	#print(moveList)
 	#time.sleep(1)
-	return moveList[random.randrange(0, index)][0] #Return random best move
+	return depth, moveList[random.randrange(0, index)][0], moveList
 
 def quiescence(board, alpha, beta):
 	score = evaluate(board)
