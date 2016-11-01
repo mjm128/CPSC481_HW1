@@ -34,7 +34,6 @@ MAX_DEPTH = 20
 UPPER = 0
 EXACT = 1
 LOWER = 2
-HAS_KNIGHT = False
 DIAGNOSTIC = True
 
 class TT_Item(Structure):
@@ -131,13 +130,6 @@ def moveThreading(data):
 	#data[1] is the score
 	#data[2] is the depth
 	#data[3] is the board
-
-	global HAS_KNIGHT
-	#Check if black knight is on board
-	if bool(data[3].pieces(chess.KNIGHT, chess.BLACK)):
-		HAS_KNIGHT = True
-	else:
-		HAS_KNIGHT = False
 
 	if data[1] == None:
 		alpha = -MAX_INT
@@ -334,21 +326,15 @@ def evaluate(board):
 	bK = board.pieces(chess.KING, chess.BLACK)
 	bN = board.pieces(chess.KNIGHT, chess.BLACK)
 	if board.turn == chess.WHITE:
-		if HAS_KNIGHT:
-			ret = heuristicX(board, wR, wN, wK, bK, bN) - heuristicY(board, wR, wN, wK, bK, bN)
-		else:
-			ret = heuristicX1(board, wR, wN, wK, bK, bN) - heuristicY1(board, wR, wN, wK, bK, bN)
+		ret = heuristicX(board, wR, wN, wK, bK, bN) - heuristicY(board, wR, wN, wK, bK, bN)
 	else:
-		if HAS_KNIGHT:
-			ret = heuristicY(board, wR, wN, wK, bK, bN) - heuristicX(board, wR, wN, wK, bK, bN)
-		else:
-			ret = heuristicY1(board, wR, wN, wK, bK, bN) - heuristicX1(board, wR, wN, wK, bK, bN)
+		ret = heuristicY(board, wR, wN, wK, bK, bN) - heuristicX(board, wR, wN, wK, bK, bN)
 
 	store_ev(board.zobrist_hash(), ret)
 
 	return ret
 
-def heuristicX1(board, wR, wN, wK, bK, bN):
+def heuristicX(board, wR, wN, wK, bK, bN):
 	score = 0
 	score += 9001 if board.result() == "1-0" else 0
 	if bool(wR): #Check to see if white rook exists
@@ -356,6 +342,18 @@ def heuristicX1(board, wR, wN, wK, bK, bN):
 		
 		score += whiteDefRook(board, wR, wK)*2
 		score += whiteRookAtk(board, wR, bK)
+		
+		#Rook attacking around Black King
+		if bool( board.attacks(list(bK)[0]).intersection(board.attacks(list(wR)[0])) ):
+			score += 5
+		
+		#defend rook with king
+		if bool( board.attacks(list(wK)[0]).intersection(wR) ):
+			score += 5
+		
+		#Rook attacking king
+		if bool( board.attacks(list(wR)[0]).intersection(bK) ):
+			score += 10
 	
 	if bool(wN):
 		score += 150 #has a Knight
@@ -372,115 +370,33 @@ def heuristicX1(board, wR, wN, wK, bK, bN):
 		if bool( board.attacks(list(wN)[0]).intersection(bK) ):
 			score += 10
 		
+	if not bool(bN):
+		score += 76
+		if not bool(wN):
+			score += 75
+	if board.is_pinned(chess.BLACK, list(bK)[0]):
+		score += 40
+	
+	if bool( board.attacks(list(bK)[0]).intersection(board.attacks(list(wK)[0])) ):
+		score += 10
+		
 	score += wkMove2bk(wK, bK)*3
 	score -= len(board.move_stack)
 	score += len(board.attacks(list(wK)[0]))
 	
 	return score
-
-def heuristicX(board, wR, wN, wK, bK, bN):
-	score = 0
-	score += 9001 if board.result() == "1-0" else 0
-	
-	WRAtk = None
-	WNAtk = None
-	WhiteAtk = None
-	KnightMoves = None
-	WKAtk = board.attacks(list(wK)[0])
-	AroundKing = board.attacks(list(bK)[0])
-	AroundKing = AroundKing.union(bK)
-	
-	if bool(bN):
-		#White Knight		
-		KnightMoves = board.attacks(list(bN)[0])
-		KnightMoves = KnightMoves.union(bN)
-		score += len(WKAtk.intersection(KnightMoves))*2
-		x = abs(chess.rank_index(list(wK)[0]) - chess.rank_index(list(bN)[0]))
-		y = abs(chess.file_index(list(wK)[0]) - chess.file_index(list(bN)[0]))
-		score -= (x+y)*5
-		
-		if bool(wR):
-			#White Rook
-			x = abs(chess.rank_index(list(wR)[0]) - chess.rank_index(list(bN)[0]))
-			y = abs(chess.file_index(list(wR)[0]) - chess.file_index(list(bN)[0]))
-			score -= min(x,y)
-			WRAtk = board.attacks(list(wR)[0])
-			score += len(WRAtk.intersection(KnightMoves))
-			WhiteAtk = WRAtk
-			
-		if bool(wN):
-			#White Knight
-			x = abs(chess.rank_index(list(wN)[0]) - chess.rank_index(list(bN)[0]))
-			y = abs(chess.file_index(list(wN)[0]) - chess.file_index(list(bN)[0]))
-			score -= (x+y)*3
-			WNAtk = board.attacks(list(wN)[0])
-			if bool(WhiteAtk):
-				WhiteAtk.union(WRAtk)
-			#Knight attacking both knight and king
-			if bool(WNAtk.intersection(bN)) and bool(WNAtk.intersection(bK)):
-				score += 50
-			score += len(WNAtk.intersection(KnightMoves))*2
-			
-	
-	if not bool(bN) and not bool(wN):
-		score += 150
-	if bool(WhiteAtk):
-		WhiteAtk = WhiteAtk.union(WKAtk)
-		score += len(AroundKing.intersection(WhiteAtk))
-		score += 10 if bool(WhiteAtk.intersection(bK)) else 0
-	
-	score -= len(board.move_stack)
-	score += len(board.attacks(list(wK)[0]))
-
-	score += len(wR)*300
-	score += len(wN)*150
-	
-	return score
 	
 def heuristicY(board, wR, wN, wK, bK, bN):
 	score = 0
+	score += 9001 if board.result() == "0-1" else 0
 	score += 9001 if board.is_stalemate() else 0
 	score += len(board.move_stack)
 	score += bKposition[list(bK)[0]]
 	score += len(board.attacks(list(bK)[0]))
 	
-	WRAtk = None
-	WNAtk = None
-	WKAtk = board.attacks(list(wK)[0])
-	
-	KnightMoves = None
-	if bool(bN):
-		KnightMoves = board.attacks(list(bN)[0])
+	if bool(bN): 
 		score += 150
-		score += knightPos[list(bN)[0]]
-		score += len(KnightMoves)*5
-		
-		#Gaurd Knight
-		if bool(board.attacks(list(bK)[0]).intersection(bN)):
-			score += 25
-		
-		if bool(wN):
-			WNAtk = board.attacks(list(wN)[0])
-			#King and Knight under attack
-			if not bool(WNAtk.intersection(bN)) and not bool(WNAtk.intersection(bK)):
-				score += 30
-
-		if bool(wR):
-			WRAtk = board.attacks(list(wR)[0])
-			#Black Knight attacking Rook
-			if bool(KnightMoves.intersection(wR)):
-				score += 10
-		if bool(KnightMoves.intersection(wK)):
-			score += 20
-
-	return score
-
-def heuristicY1(board, wR, wN, wK, bK, bN):
-	score = 0
-	score += 9001 if board.is_stalemate() else 0
-	score += len(board.move_stack)
-	score += bKposition[list(bK)[0]]
-	score += len(board.attacks(list(bK)[0]))
+		score += len(board.attacks(list(bK)[0]).intersection(bN)) * 6
 	
 	return score
 	
