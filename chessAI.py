@@ -63,6 +63,7 @@ killerMove = {}
 
 #Load evaluation table 
 def load_ev(key):
+	return None
 	item = copy.deepcopy(EV_Table[key % len(EV_Table)])
 	return item.val if item.key == key else None
 
@@ -138,8 +139,9 @@ def moveThreading(data):
 		alpha = data[1] - 15
 		beta = data[1] + 15
 
+	moveCount = len(data[3].move_stack)
 	data[3].push(data[0])
-	data[1] = -negaScout(data[3], -beta, -alpha, data[2])
+	data[1] = -negaScout(data[3], -beta, -alpha, data[2], moveCount)
 	data[3].pop()
 
 	while data[1] <= alpha or data[1] >= beta:
@@ -149,7 +151,7 @@ def moveThreading(data):
 			beta = MAX_INT
 
 		data[3].push(data[0])
-		data[1] = -negaScout(data[3], -beta, -alpha, data[2])
+		data[1] = -negaScout(data[3], -beta, -alpha, data[2], moveCount)
 		data[3].pop()
 
 	return data
@@ -225,8 +227,8 @@ def computerPlayer(board):
 	#time.sleep(1)
 	return depth, moveList[random.randrange(0, index)][0], moveList
 
-def quiescence(board, alpha, beta):
-	score = evaluate(board)
+def quiescence(board, alpha, beta, moveCount):
+	score = evaluate(board, moveCount)
 	if score >= beta:
 		return score
 	elif score > alpha:
@@ -236,7 +238,7 @@ def quiescence(board, alpha, beta):
 		if not board.is_capture(i):
 			continue
 		board.push(i)
-		score = -quiescence(board, -beta, -alpha)
+		score = -quiescence(board, -beta, -alpha, moveCount)
 		board.pop()
 
 		if score >= beta:
@@ -253,11 +255,11 @@ def isValid(board, move):
 	board.pop()
 	return valid
 
-def negaScout(board, alpha, beta, depth):
+def negaScout(board, alpha, beta, depth, moveCount):
 	if board.result() != "*":
-		return evaluate(board)
+		return evaluate(board, moveCount)
 	if depth == 0:
-		return quiescence(board, alpha, beta)
+		return quiescence(board, alpha, beta, moveCount)
 
 	boundType = UPPER
 	item = load_tt(board.zobrist_hash(), alpha, beta, depth)
@@ -266,7 +268,7 @@ def negaScout(board, alpha, beta, depth):
 			return item[0]
 		elif isValid(board, item[1]):
 			board.push(item[1])
-			score = -negaScout(board, -beta, -alpha, depth - 1)
+			score = -negaScout(board, -beta, -alpha, depth - 1, moveCount)
 			board.pop()
 
 			if score >= beta:
@@ -279,7 +281,7 @@ def negaScout(board, alpha, beta, depth):
 
 	if depth in killerMove and isValid(board, killerMove[depth]):
 		board.push(killerMove[depth])
-		score = -negaScout(board, -beta, -alpha, depth - 1)
+		score = -negaScout(board, -beta, -alpha, depth - 1, moveCount)
 		board.pop()
 
 		if score >= beta:
@@ -294,11 +296,11 @@ def negaScout(board, alpha, beta, depth):
 	bestMove = None
 	for i in board.legal_moves:
 		board.push(i)
-		score = -negaScout(board, -b, -alpha, depth - 1)
+		score = -negaScout(board, -b, -alpha, depth - 1, moveCount)
 		board.pop()
 		if score > alpha and score < beta and c > 0:
 			board.push(i)
-			score = -negaScout(board, -beta, -alpha, depth - 1)
+			score = -negaScout(board, -beta, -alpha, depth - 1, moveCount)
 			board.pop()
 		if score > alpha:
 			boundType = EXACT
@@ -315,28 +317,35 @@ def negaScout(board, alpha, beta, depth):
 
 	return alpha
 	
-def evaluate(board):
+def evaluate(board, c):
 	val = load_ev(board.zobrist_hash())
 	if val != None:
 		return val
-		
-	wR = board.pieces(chess.ROOK, chess.WHITE)
-	wN = board.pieces(chess.KNIGHT, chess.WHITE)
-	wK = board.pieces(chess.KING, chess.WHITE)
-	bK = board.pieces(chess.KING, chess.BLACK)
-	bN = board.pieces(chess.KNIGHT, chess.BLACK)
-	if board.turn == chess.WHITE:
-		ret = heuristicX(board, wR, wN, wK, bK, bN) - heuristicY(board, wR, wN, wK, bK, bN)
+
+	if board.is_checkmate():
+		ret = 1 if board.turn else -1
+		ret *= 9001 - (len(board.move_stack)-c)*50
+	elif board.is_stalemate():
+		ret = -1 if board.turn else 1
+		ret *= 8999
 	else:
-		ret = heuristicY(board, wR, wN, wK, bK, bN) - heuristicX(board, wR, wN, wK, bK, bN)
+		wR = board.pieces(chess.ROOK, chess.WHITE)
+		wN = board.pieces(chess.KNIGHT, chess.WHITE)
+		wK = board.pieces(chess.KING, chess.WHITE)
+		bK = board.pieces(chess.KING, chess.BLACK)
+		bN = board.pieces(chess.KNIGHT, chess.BLACK)
+		if board.turn == chess.WHITE:
+			ret = heuristicX(board, wR, wN, wK, bK, bN, c) - heuristicY(board, wR, wN, wK, bK, bN, c)
+		else:
+			ret = heuristicY(board, wR, wN, wK, bK, bN, c) - heuristicX(board, wR, wN, wK, bK, bN, c)
 
 	store_ev(board.zobrist_hash(), ret)
 
 	return ret
 
-def heuristicX(board, wR, wN, wK, bK, bN):
+def heuristicX(board, wR, wN, wK, bK, bN, c):
 	score = 0
-	score += 9001 if board.result() == "1-0" else 0
+	
 	if bool(wR): #Check to see if white rook exists
 		score += 300 #Has a rook
 		
@@ -381,18 +390,13 @@ def heuristicX(board, wR, wN, wK, bK, bN):
 		score += 10
 		
 	score += wkMove2bk(wK, bK)*3
-	score -= len(board.move_stack)
 	score += len(board.attacks(list(wK)[0]))
 	
 	return score
 	
-def heuristicY(board, wR, wN, wK, bK, bN):
+def heuristicY(board, wR, wN, wK, bK, bN, c):
 	score = 0
-	score += 9001 if board.result() == "0-1" else 0
-	score += 9001 if board.is_stalemate() else 0
-	score += len(board.move_stack)
 	score += bKposition[list(bK)[0]]
-	score += len(board.attacks(list(bK)[0]))
 	
 	if bool(bN): 
 		score += 150
