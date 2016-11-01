@@ -2,6 +2,8 @@
 
 import chess, chessAI
 
+STARTING_BOARD = '2n1k3/8/8/8/8/8/8/4K1NR w - - 0 0'
+
 def moveListToStr(moveList):
 	l = [item[0].uci() + '(' + str(item[1]) + ')' for item in moveList]
 	return ', '.join(l)
@@ -96,8 +98,15 @@ def runCmd(board):
 
 	if cmd == "quit":
 		return False
+	elif cmd == "reset":
+		board.set_fen(STARTING_BOARD)
+		print(board)
 	elif cmd == "print":
 		print(board)
+		print("moves: " + str([item.uci() for item in board.move_stack]))
+		print("fen  : " + board.fen())
+	elif cmd == "hash":
+		print(board.zobrist_hash())
 	elif cmd == "limits":
 		print("depth: " + str(chessAI.MAX_DEPTH))
 		print("time : " + str(chessAI.MAX_TIME))
@@ -114,6 +123,12 @@ def runCmd(board):
 			print("invalid depth: " + args)
 	elif cmd == "setboard":
 		board.set_fen(args)
+		print(board)
+	elif cmd == "undo":
+		try:
+			board.pop()
+		except IndexError:
+			pass
 		print(board)
 	elif cmd == "move":
 		try:
@@ -140,7 +155,7 @@ def runCmd(board):
 	return True
 
 def main():
-	board = chess.Board('2n1k3/8/8/8/8/8/8/4K1NR w - - 0 0')
+	board = chess.Board(STARTING_BOARD)
 	while runCmd(board):
 		pass
 
