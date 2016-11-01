@@ -59,6 +59,9 @@ EV_Table = Array(EV_Item, 2097169, lock=False)
 # grows at about 11k per search
 TT_Table = Array(TT_Item,  524309, lock=False)
 
+# killer move, not shared
+killerMove = {}
+
 #Load evaluation table 
 def load_ev(key):
 	item = copy.deepcopy(EV_Table[key % len(EV_Table)])
@@ -275,11 +278,24 @@ def negaScout(board, alpha, beta, depth):
 			board.pop()
 
 			if score >= beta:
+				killerMove[depth] = item[1]
 				store_tt(board.zobrist_hash(), score, depth, item[1], LOWER)
 				return beta
 			elif score > alpha:
 				alpha = score
 				boundType = EXACT
+
+	if depth in killerMove and isValid(board, killerMove[depth]):
+		board.push(killerMove[depth])
+		score = -negaScout(board, -beta, -alpha, depth - 1)
+		board.pop()
+
+		if score >= beta:
+			store_tt(board.zobrist_hash(), score, depth, killerMove[depth], LOWER)
+			return beta
+		elif score > alpha:
+			alpha = score
+			boundType = EXACT
 
 	b = beta
 	c = 0
@@ -302,6 +318,7 @@ def negaScout(board, alpha, beta, depth):
 		b = alpha + 1
 		c += 1
 
+	killerMove[depth] = bestMove
 	store_tt(board.zobrist_hash(), alpha, depth, bestMove, boundType)
 
 	return alpha
