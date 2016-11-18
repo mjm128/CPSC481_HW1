@@ -29,7 +29,7 @@ knightPos = [-50,-40,-30,-30,-30,-30,-40,-50,
 			-50,-40,-30,-30,-30,-30,-40,-50,]
 
 MAX_INT = 100000
-MAX_TIME = 5
+MAX_TIME = 10
 MAX_DEPTH = 20
 UPPER = 0
 EXACT = 1
