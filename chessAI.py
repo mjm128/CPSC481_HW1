@@ -29,7 +29,7 @@ knightPos = [-50,-40,-30,-30,-30,-30,-40,-50,
 			-50,-40,-30,-30,-30,-30,-40,-50,]
 
 MAX_INT = 100000
-MAX_TIME = 10
+MAX_TIME = 5
 MAX_DEPTH = 20
 UPPER = 0
 EXACT = 1
@@ -162,6 +162,7 @@ def search(board, maxDepth, maxTime):
 	threadData = [[i, None, 0, board] for i in board.legal_moves]
 	threads = min(len(threadData), cpu_count()-1)
 	pool = ThreadPool(processes=threads)
+	processes = pool._pool
 	moveList = []
 	gotDepth = -1
 	for depth in range(0, maxDepth):
@@ -184,7 +185,8 @@ def search(board, maxDepth, maxTime):
 					for i in moveList:
 						f.write("['"+str(i[0])+"'_"+str(i[1])+']')
 					f.write('\n')
-			pool.terminate()
+			pool.close()
+			pool.terminate()			
 			pool.join()
 			pool = None
 			break
@@ -256,7 +258,7 @@ def isValid(board, move):
 	return valid
 
 def negaScout(board, alpha, beta, depth, moveCount):
-	if board.result() != "*":
+	if board.result() != "*" or board.is_game_over():
 		return evaluate(board, moveCount)
 	if depth == 0:
 		return quiescence(board, alpha, beta, moveCount)
@@ -349,8 +351,9 @@ def heuristicX(board, wR, wN, wK, bK, bN, c):
 	if bool(wR): #Check to see if white rook exists
 		score += 300 #Has a rook
 		
-		score += whiteDefRook(board, wR, wK)*2
-		score += whiteRookAtk(board, wR, bK)
+		x = abs(chess.rank_index(list(wR)[0]) - chess.rank_index(list(bK)[0]))
+		y = abs(chess.file_index(list(wR)[0]) - chess.file_index(list(bK)[0]))
+		score -= min(x,y)
 		
 		#Rook attacking around Black King
 		if bool( board.attacks(list(bK)[0]).intersection(board.attacks(list(wR)[0])) ):
@@ -378,6 +381,10 @@ def heuristicX(board, wR, wN, wK, bK, bN, c):
 		#Knight attacking king
 		if bool( board.attacks(list(wN)[0]).intersection(bK) ):
 			score += 10
+			
+		x = abs(chess.rank_index(list(wN)[0]) - chess.rank_index(list(bK)[0]))
+		y = abs(chess.file_index(list(wN)[0]) - chess.file_index(list(bK)[0]))
+		score -= min(x,y)
 		
 	if not bool(bN):
 		score += 76
@@ -389,7 +396,10 @@ def heuristicX(board, wR, wN, wK, bK, bN, c):
 	if bool( board.attacks(list(bK)[0]).intersection(board.attacks(list(wK)[0])) ):
 		score += 10
 		
-	score += wkMove2bk(wK, bK)*3
+	x = abs(chess.rank_index(list(wK)[0]) - chess.rank_index(list(bK)[0]))
+	y = abs(chess.file_index(list(wK)[0]) - chess.file_index(list(bK)[0]))
+	score -= min(x,y)*2
+	
 	score += len(board.attacks(list(wK)[0]))
 	
 	return score
@@ -403,18 +413,4 @@ def heuristicY(board, wR, wN, wK, bK, bN, c):
 		score += len(board.attacks(list(bK)[0]).intersection(bN)) * 6
 	
 	return score
-	
-def whiteDefRook(board, wr, wk):
-	x = chess.rank_index(list(wr)[0]) - chess.rank_index(list(wk)[0])
-	y = chess.file_index(list(wr)[0]) - chess.file_index(list(wk)[0])
-	return 20-floor((y**2 + x**2)**(1/2))
-	
-def whiteRookAtk(board, wr, bk):
-	x = abs(chess.rank_index(list(wr)[0]) - chess.rank_index(list(bk)[0]))
-	y = abs(chess.file_index(list(wr)[0]) - chess.file_index(list(bk)[0]))
-	return 8-min(x,y)
-	
-def wkMove2bk(wk, bk):
-	x = chess.rank_index(list(wk)[0]) - chess.rank_index(list(bk)[0])
-	y = chess.file_index(list(wk)[0]) - chess.file_index(list(bk)[0])
-	return 20 - floor((y**2 + x**2)**(1/2))
+
